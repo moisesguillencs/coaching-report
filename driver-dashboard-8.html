@@ -1,0 +1,2487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coaching Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── DASHBOARD ── */
+:root{--ink:#1a1a1a;--line:#d1d5db;--accent:#c0392b;--bg:#f1f5f9;--paper:#fff;--teal:#1e7a8c;--green:#16a34a;--orange:#f59e0b;--red:#dc2626;--blue:#2563eb}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);font-family:'Source Serif 4',Georgia,serif;color:var(--ink)}
+.app{max-width:1200px;margin:0 auto;padding:18px}
+.topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap}
+h1{font-size:22px;margin:0}
+.small{color:#666;font-size:13px;font-family:Arial,sans-serif}
+.card{background:var(--paper);border:1px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,.06);padding:18px;border-radius:10px;margin-bottom:14px}
+
+/* uploads */
+.uploads{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+.ubox{border:1.5px dashed #cbd5e1;border-radius:10px;padding:14px;background:#f8fafc;transition:all .2s}
+.ubox.loaded{border-color:var(--green);background:#f0fff5}
+.ubox b{display:block;font-family:Arial,sans-serif;font-size:13px;margin-bottom:3px}
+.ubox .hint{font-size:10px;color:#aaa;font-family:Arial,sans-serif;margin-bottom:8px}
+.ubox .ustat{font-size:11px;font-family:Arial,sans-serif;font-weight:700;margin-top:6px;min-height:14px;color:var(--green)}
+input[type=file]{width:100%;font-size:12px;font-family:Arial,sans-serif}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{font-family:Arial,sans-serif;border:1.5px solid var(--ink);background:white;padding:9px 16px;border-radius:9px;cursor:pointer;font-weight:700;font-size:13px;transition:all .15s}
+.btn:hover{filter:brightness(.92)}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:white}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:white}
+.btn.blue{background:var(--blue);border-color:var(--blue);color:white}
+#status{font-family:Arial,sans-serif;font-size:12px;padding:6px 12px;border-radius:8px;background:#f8fafc;margin-top:10px;border:1px solid var(--line)}
+#status.ok{background:#dcfce7;color:#166534}
+#status.err{background:#fee2e2;color:#991b1b}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.stat{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:14px}
+.stat .num{font-size:28px;font-weight:800;font-family:Arial,sans-serif}
+.stat .lbl{font-size:10px;color:#666;font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:.05em}
+
+/* grid */
+.grid{display:grid;grid-template-columns:340px 1fr;gap:14px}
+.toolbar{display:flex;gap:8px;margin-bottom:10px}
+.search{flex:1;border:1.5px solid #bbb;border-radius:9px;padding:10px;font-size:14px;outline:none;font-family:Arial,sans-serif}
+.search:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(30,122,140,.12)}
+.sel{border:1.5px solid #bbb;border-radius:9px;padding:10px;background:white;font-size:12px;font-family:Arial,sans-serif}
+.driverList{max-height:680px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.driverItem{padding:10px 12px;border-bottom:1px solid #eee;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background .1s}
+.driverItem:hover{background:#f1f5f9}
+.btn-coaching{font-family:Arial,sans-serif;font-size:10px;font-weight:700;padding:4px 9px;border:1.5px solid var(--accent);border-radius:6px;background:white;color:var(--accent);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s}
+.btn-coaching:hover{background:var(--accent);color:white}
+.del-btn{font-family:Arial,sans-serif;font-size:11px;font-weight:700;padding:2px 7px;border:1.5px solid #fca5a5;border-radius:5px;background:#fee2e2;color:#991b1b;cursor:pointer;line-height:1;transition:all .15s}
+.del-btn:hover{background:#dc2626;border-color:#dc2626;color:white}
+.driverItem.active{background:#fff5f5;border-left:3px solid var(--accent);padding-left:9px}
+.driverName{font-weight:800;font-size:13px;font-family:Arial,sans-serif}
+.badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}
+.badge{font-family:Arial,sans-serif;font-size:10px;border-radius:999px;padding:2px 7px;border:1px solid #ddd;background:#f8f8f8}
+.b-red{background:#fee2e2;border-color:#fecaca;color:#991b1b}
+.b-orange{background:#ffedd5;border-color:#fed7aa;color:#9a3412}
+.b-green{background:#dcfce7;border-color:#bbf7d0;color:#166534}
+.b-teal{background:#e0f2fe;border-color:#bae6fd;color:#0c4a6e}
+
+/* profile */
+.profileHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px}
+.profileHead h2{margin:0;font-size:22px}
+.secTitle{font-family:Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;font-size:11px;color:#555;margin:16px 0 8px;font-weight:900;border-bottom:1px solid #eee;padding-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:12px;font-family:Arial,sans-serif}
+th{background:#f8fafc;text-align:left;padding:7px 8px;font-size:10px;text-transform:uppercase;color:#555;border-bottom:2px solid #e0e0e0;letter-spacing:.04em}
+td{border-bottom:1px solid #f0f0f0;padding:7px 8px;vertical-align:top}
+tr:hover td{background:#fafafa}
+.empty{color:#777;font-style:italic;padding:14px;border:1px dashed #ccc;border-radius:10px;background:#fafafa;font-family:Arial,sans-serif;font-size:13px}
+.flag{display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;font-family:Arial,sans-serif}
+.f-r{background:#fee2e2;color:#991b1b}
+.f-o{background:#ffedd5;color:#9a3412}
+.f-t{background:#e0f2fe;color:#0c4a6e}
+.reasonPills{display:flex;gap:5px;flex-wrap:wrap}
+.multi-viol{border-left:3px solid var(--purple,#a78bfa)!important;background:rgba(167,139,250,.04)!important}
+.multi-viol .driverName{color:var(--purple,#a78bfa)}
+.preview{border:1px solid var(--line);background:#fafafa;border-radius:10px;padding:14px;white-space:pre-wrap;line-height:1.7;font-size:13px;font-family:Arial,sans-serif;margin-top:8px}
+
+/* ── COACHING SHEET — EXACT ORIGINAL STYLE ── */
+.coaching-wrap{display:none}
+#batchWrap{display:none}
+.date-toggle{font-family:Arial,sans-serif;font-size:12px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none;color:#444}
+.file-list{margin-top:6px;display:flex;flex-direction:column;gap:3px}
+.file-chip{font-family:Arial,sans-serif;font-size:11px;background:#eef4ff;border:1px solid #cfe0ff;border-radius:6px;padding:3px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px;color:#1e3a5f}
+.file-x{cursor:pointer;color:#c0392b;font-weight:700;padding:0 2px}
+.file-x:hover{color:#000}
+.file-total{font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#16a34a;margin-top:2px}
+.date-toggle input{cursor:pointer;width:14px;height:14px}
+.mode-toggle{display:inline-flex;gap:10px;font-family:Arial,sans-serif;font-size:12px;color:#444;background:#f5f5f5;padding:4px 10px;border-radius:8px;border:1px solid #ddd}
+.mode-toggle label{display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+.mode-toggle input{cursor:pointer}
+.date-control{display:inline-flex;align-items:center;gap:6px}
+.controls-bar .date-toggle{margin-right:auto}
+#batchWrap.active{display:block}
+.batch-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px}
+.batch-bar .btn{margin-left:6px}
+.batch-item{position:relative;margin-bottom:30px}
+.summary-sheet{background:var(--paper);width:min(750px,95vw);padding:40px 56px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,.1);border-top:5px solid var(--ink)}
+.summary-table{width:100%;border-collapse:collapse;margin-top:20px;font-family:Arial,sans-serif}
+.summary-table th{background:#f5f5f5;text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;color:#555;border-bottom:2px solid #ddd;letter-spacing:.04em}
+.summary-table td{padding:8px 10px;border-bottom:1px solid #eee;font-size:13px;vertical-align:middle}
+.summary-table tr:hover td{background:#fafafa}
+.inc-x{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:5px;padding:3px 9px;font-size:13px;font-weight:700;cursor:pointer;line-height:1}
+.inc-x:hover{background:#dc2626;color:#fff;border-color:#dc2626}
+.sum-remove{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:5px;padding:3px 9px;font-size:12px;font-weight:700;cursor:pointer}
+.sum-remove:hover{background:#dc2626;color:#fff;border-color:#dc2626}
+.summary-foot{margin-top:18px;font-family:Arial,sans-serif;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:10px}
+.batch-actions{position:absolute;top:8px;right:8px;z-index:5;display:flex;gap:6px}
+.batch-print{background:#dbeafe;color:#1e3a8a;border:1px solid #bfdbfe;border-radius:6px;padding:5px 12px;font-family:Arial,sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s}
+.batch-print:hover{background:#2563eb;color:#fff;border-color:#2563eb}
+.batch-remove{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:6px;padding:5px 12px;font-family:Arial,sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s}
+.batch-remove:hover{background:#dc2626;color:#fff;border-color:#dc2626}
+#batchContainer .batch-sheet{background:var(--paper);width:min(750px,95vw);padding:40px 56px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,.1);border-top:5px solid var(--ink)}
+.batch-line{border-bottom:1.5px solid var(--line);padding:5px 4px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;min-height:22px}
+.batch-date{font-family:'IBM Plex Mono',monospace;font-size:12.5px;border-bottom:1.5px solid var(--line);padding:0 14px 2px}
+.batch-sig{flex:1;border-bottom:1.5px solid var(--line);min-height:26px}
+.batch-sheet .reason-item input{pointer-events:none}
+.coaching-wrap.visible{display:block}
+.controls-bar{display:flex;gap:10px;margin-bottom:20px;justify-content:center}
+.controls-bar button{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:9px 22px;border:1.5px solid var(--ink);background:transparent;cursor:pointer;color:var(--ink);transition:all .15s}
+.controls-bar button:hover{background:var(--ink);color:white}
+.controls-bar button.cprimary{background:var(--accent);border-color:var(--accent);color:white}
+.controls-bar button.cprimary:hover{background:#a93226}
+.sheet{background:var(--paper);width:min(750px,95vw);min-height:970px;padding:52px 64px 48px;margin:0 auto;box-shadow:0 4px 40px rgba(0,0,0,.13);border-top:5px solid var(--ink);display:flex;flex-direction:column}
+.sheet-title{text-align:center;font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:500;letter-spacing:.32em;text-transform:uppercase;margin-top:28px;margin-bottom:36px;padding-bottom:18px;border-bottom:1px solid #ddd}
+.field-row{display:flex;align-items:center;margin-bottom:30px;gap:12px}
+.field-label{font-size:12.5px;font-weight:600;white-space:nowrap;min-width:165px;letter-spacing:.01em}
+.driver-wrapper{flex:1;position:relative}
+#driver-input{width:100%;border:none;border-bottom:1.5px solid var(--line);outline:none;font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:5px 4px;background:transparent;color:var(--ink)}
+#driver-input:focus{border-bottom-color:var(--accent)}
+#driver-dropdown{display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1.5px solid var(--ink);border-top:none;max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,.12)}
+#driver-dropdown .dd-item{padding:7px 12px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;cursor:pointer;border-bottom:1px solid #f0f0f0}
+#driver-dropdown .dd-item:hover,#driver-dropdown .dd-item.active{background:var(--accent);color:white}
+.date-wrapper{display:flex;align-items:center;gap:3px;position:relative}
+.date-wrapper input[type=text]{border:none;border-bottom:1.5px solid var(--line);outline:none;font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:5px 3px;background:transparent;color:var(--ink);text-align:center}
+.date-wrapper input[type=text]:focus{border-bottom-color:var(--accent)}
+.date-mm,.date-dd{width:34px}.date-yyyy{width:52px}
+.date-sep{color:var(--line);font-weight:600;font-family:'IBM Plex Mono',monospace}
+.cal-icon{cursor:pointer;font-size:14px;margin-left:8px;opacity:.6;transition:opacity .15s}
+.cal-icon:hover{opacity:1}
+.reason-section{margin-bottom:30px}
+.reason-section>.field-label{display:block;margin-bottom:16px}
+.reason-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;margin-bottom:18px}
+.reason-item{display:flex;align-items:center;gap:10px;padding:8px 6px;border:1px solid transparent;cursor:pointer;user-select:none;transition:all .13s;background:transparent}
+.reason-item:hover{background:#f5f5f5}
+.reason-item.checked{background:rgba(192,57,43,.04)}
+.reason-item input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;flex-shrink:0;cursor:pointer}
+.reason-item span{font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.4}
+.reason-textarea{width:100%;min-height:120px;border:none;border-bottom:1.5px solid var(--line);outline:none;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:6px 4px;resize:vertical;background:transparent;color:var(--ink);line-height:1.7}
+.reason-textarea:focus{border-bottom-color:var(--accent)}
+#reason-print,#notes-print{display:none}
+/* Inside the batch book, show the records on screen */
+#batchContainer .reason-print,#batchContainer .notes-print{display:block;width:100%;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;padding:4px 2px;margin:0}
+.sig-section{border-top:1px solid #ddd;padding-top:28px;margin-bottom:28px}
+.sig-input{flex:1;border:none;border-bottom:1.5px solid var(--line);outline:none;font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:8px 4px;background:transparent;color:var(--ink);font-style:italic}
+.sig-input:focus{border-bottom-color:var(--accent)}
+.notes-block{border-top:1px solid #ddd;padding-top:28px;flex:1;display:flex;flex-direction:column;margin-bottom:28px}
+.notes-block>.field-label{display:block;margin-bottom:12px}
+.notes-block textarea{flex:1;width:100%;min-height:120px;border:none;border-bottom:1.5px solid var(--line);outline:none;font-family:'Source Serif 4',serif;font-size:11px;padding:6px 4px;resize:vertical;background:transparent;color:var(--ink);line-height:1.6}
+.notes-block textarea:focus{border-bottom-color:var(--accent)}
+.disclaimer{border-top:1px solid #ddd;padding-top:14px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#999;line-height:1.6;margin-top:auto}
+
+@media(max-width:900px){.uploads,.grid,.stats{grid-template-columns:1fr}.driverList{max-height:360px}.profileHead{display:block}}
+
+@page {
+    size: letter portrait;
+    margin: 12mm 12mm;
+  }
+
+  
+/* ── IMPROVEMENTS ── */
+
+/* Sticky controls bar */
+.controls-bar{
+  position:sticky;top:0;z-index:50;
+  background:rgba(255,255,255,.95);
+  backdrop-filter:blur(6px);
+  border-bottom:1px solid #e5e5e5;
+  padding:10px 0 12px;
+  margin-bottom:16px!important;
+}
+
+/* Auto-resize textarea visual */
+.reason-textarea, .notes-block textarea{
+  overflow:hidden;
+  min-height:40px;
+  transition:height .1s;
+}
+
+/* Character counter */
+.char-counter{
+  font-family:Arial,sans-serif;
+  font-size:10px;
+  color:#aaa;
+  text-align:right;
+  margin-top:2px;
+  transition:color .2s;
+}
+.char-counter.warn{color:var(--orange);}
+.char-counter.over{color:var(--red);font-weight:700;}
+
+/* Overflow warning banner */
+.overflow-warn{
+  display:none;
+  background:#fff3cd;
+  border:1px solid #ffc107;
+  border-radius:8px;
+  padding:8px 14px;
+  font-family:Arial,sans-serif;
+  font-size:12px;
+  color:#856404;
+  margin-bottom:10px;
+}
+.overflow-warn.visible{display:flex;gap:8px;align-items:center;}
+
+/* Toast notification */
+.toast{
+  position:fixed;bottom:24px;right:24px;
+  background:#1a1a1a;color:white;
+  font-family:Arial,sans-serif;font-size:13px;
+  padding:10px 18px;border-radius:10px;
+  box-shadow:0 4px 20px rgba(0,0,0,.25);
+  opacity:0;transform:translateY(8px);
+  transition:all .25s;pointer-events:none;
+  z-index:9999;
+}
+.toast.show{opacity:1;transform:translateY(0);}
+
+/* Search highlight */
+.hl{background:#fef08a;border-radius:2px;padding:0 1px;}
+
+/* Copy button */
+.copy-btn{
+  font-family:Arial,sans-serif;font-size:11px;font-weight:700;
+  padding:4px 10px;border:1.5px solid #bbb;border-radius:6px;
+  background:white;cursor:pointer;transition:all .15s;
+  vertical-align:middle;
+}
+.copy-btn:hover{background:#f0f0f0;border-color:#888;}
+.copy-btn.copied{border-color:var(--green);color:var(--green);}
+
+/* Expand notes modal */
+.notes-expand-btn{
+  font-family:Arial,sans-serif;font-size:10px;
+  padding:3px 8px;border:1px solid #ccc;border-radius:5px;
+  background:white;cursor:pointer;float:right;margin-top:-2px;
+  transition:all .15s;
+}
+.notes-expand-btn:hover{background:#f5f5f5;}
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+  z-index:1000;align-items:center;justify-content:center;
+}
+.modal-overlay.open{display:flex;}
+.modal-box{
+  background:white;border-radius:14px;padding:24px;
+  width:min(680px,92vw);max-height:80vh;display:flex;flex-direction:column;
+  box-shadow:0 8px 40px rgba(0,0,0,.25);
+}
+.modal-box h3{font-size:16px;margin-bottom:12px;font-family:Arial,sans-serif;}
+.modal-box textarea{
+  flex:1;min-height:300px;border:1px solid #ddd;border-radius:8px;
+  padding:12px;font-family:'IBM Plex Mono',monospace;font-size:12px;
+  line-height:1.6;resize:none;outline:none;spellcheck:true;
+}
+.modal-box textarea:focus{border-color:var(--teal);}
+.modal-actions{display:flex;gap:8px;margin-top:12px;justify-content:flex-end;}
+
+/* Keyboard shortcut hints */
+.kbd{
+  display:inline-block;font-family:'IBM Plex Mono',monospace;
+  font-size:9px;background:#f0f0f0;border:1px solid #ccc;
+  border-bottom:2px solid #bbb;border-radius:3px;
+  padding:1px 4px;color:#555;vertical-align:middle;
+}
+
+/* Driver list active item auto-scroll is handled by JS */
+/* Focus ring improvement */
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px;}
+
+@media print {
+    html {
+      background: white !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      zoom: 1 !important;
+    }
+
+    body {
+      background: white !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      display: block !important;
+      width: auto !important;
+      transform: none !important;
+    }
+
+    .app>.topbar,.app>.card:not(.printable){display:none!important}
+    .app{padding:0!important;margin:0!important}
+    .printable{border:none!important;box-shadow:none!important;padding:0!important;margin:0!important}
+    .controls-bar { display: none !important; }
+
+    .sheet {
+      width: auto !important;
+      min-height: 248mm !important;
+      height: auto !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      box-shadow: none !important;
+      border-top: 5px solid black !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: visible !important;
+    }
+
+    .sheet-title { margin-top: 20px !important; margin-bottom: 22px !important; flex: 0 0 auto !important; }
+
+    /* Each major block keeps natural size; flexible gaps between them share leftover space */
+    .field-row { margin-bottom: 18px !important; flex: 0 0 auto !important; }
+    .reason-section { margin-bottom: 0 !important; flex: 0 0 auto !important; }
+    .reason-grid { gap: 14px 16px !important; margin-bottom: 14px !important; page-break-inside: avoid !important; }
+    .reason-item { padding: 6px 6px !important; }
+    .reason-textarea, .notes-block textarea { display: none !important; }
+    .reason-print, .notes-print {
+      display: block !important;
+      width: 100% !important;
+      font-family: 'IBM Plex Mono', monospace !important;
+      font-size: var(--fit-fs, 15px) !important;
+      line-height: 1.55 !important;
+      white-space: pre-wrap !important;
+      word-break: break-word !important;
+      padding: 4px 2px !important;
+      margin: 0 !important;
+      overflow: visible !important;
+      height: auto !important;
+    }
+    .reason-print { min-height: 20px !important; }
+    .notes-print  { min-height: 40px !important; }
+
+    /* Flexible spacer — grows to fill the page when content is short */
+    .print-spacer { flex: 1 1 auto !important; min-height: 8px !important; display: block !important; }
+
+    .sig-section { padding-top: 16px !important; margin-bottom: 0 !important; flex: 0 0 auto !important; page-break-inside: avoid !important; }
+    .sig-section .field-row { margin-bottom: 22px !important; }
+    .notes-block { padding-top: 16px !important; margin-bottom: 0 !important; flex: 0 0 auto !important; display: block !important; }
+    .disclaimer { flex: 0 0 auto !important; }
+    /* single coaching = one page */
+    .sheet { page-break-inside: avoid !important; }
+
+    /* Hide interactive elements */
+    #driver-dropdown { display: none !important; }
+    .cal-icon { display: none !important; }
+    .disclaimer { margin-top: 14px !important; }
+    input::placeholder, textarea::placeholder { color: transparent !important; }
+
+    /* ── DEFAULT PRINT: single coaching sheet only, hide batch ── */
+    #batchWrap { display: none !important; }
+
+    /* ── BATCH PRINT MODE: show only the batch, each sheet its own page ── */
+    body.printing-batch .app > .card.printable { display: none !important; }
+    .noPrint, .batch-remove, .batch-print, .batch-actions { display: none !important; }
+    .del-btn, .btn-coaching, .copy-btn, .notes-expand-btn { display: none !important; }
+    .char-counter, .overflow-warn { display: none !important; }
+
+    /* ── PRINT-ONE MODE: print only the selected coaching ── */
+    body.printing-one .app > .card.printable { display: none !important; }
+    body.printing-one #batchWrap { display: block !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; border: none !important; }
+    body.printing-one .batch-bar { display: none !important; }
+    body.printing-one #batchContainer .batch-item { display: none !important; }
+    body.printing-one #batchContainer .batch-item.print-only-this { display: block !important; page-break-after: auto !important; margin: 0 !important; padding: 0 !important; }
+    body.printing-one #batchContainer .summary-item { display: none !important; }
+    body.printing-one #batchContainer .print-only-this .batch-sheet {
+      width: auto !important; min-height: 248mm !important; height: auto !important;
+      padding: 0 !important; margin: 0 !important; box-shadow: none !important;
+      border-top: 5px solid black !important; display: flex !important; flex-direction: column !important; overflow: visible !important;
+    }
+    body.printing-one .print-only-this .print-spacer { display: block !important; flex: 1 1 auto !important; min-height: 8px !important; }
+    body.printing-one .print-only-this .reason-print,
+    body.printing-one .print-only-this .notes-print { font-size: var(--fit-fs, 15px) !important; line-height: 1.5 !important; overflow: visible !important; height: auto !important; }
+
+    /* ── SUMMARY-ONLY PRINT MODE ── */
+    body.printing-summary-only .app > .card.printable { display: none !important; }
+    body.printing-summary-only #batchWrap {
+      display: block !important;
+      margin: 0 !important; padding: 0 !important;
+      box-shadow: none !important; border: none !important;
+    }
+    body.printing-summary-only .batch-bar { display: none !important; }
+    /* hide every coaching sheet, keep only the summary */
+    body.printing-summary-only #batchContainer .batch-item { display: none !important; }
+    body.printing-summary-only #batchContainer .summary-item { display: block !important; page-break-after: auto !important; }
+    body.printing-summary-only #batchContainer .summary-sheet {
+      width: auto !important; padding: 0 !important; margin: 0 !important;
+      box-shadow: none !important; border-top: 5px solid black !important;
+    }
+    body.printing-summary-only .summary-table th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    body.printing-batch #batchWrap {
+      display: block !important;
+      margin: 0 !important; padding: 0 !important;
+      box-shadow: none !important; border: none !important;
+    }
+    body.printing-batch .batch-bar { display: none !important; }
+    body.printing-batch #batchContainer .summary-item { display: none !important; }
+    body.printing-batch #batchContainer .batch-item {
+      margin: 0 !important;
+      padding: 0 !important;
+      page-break-after: always !important;
+      break-after: page !important;
+    }
+    body.printing-batch #batchContainer .batch-item:last-child {
+      page-break-after: auto !important;
+      break-after: auto !important;
+    }
+    body.printing-batch #batchContainer .batch-sheet {
+      width: auto !important;
+      min-height: 248mm !important;
+      height: auto !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      box-shadow: none !important;
+      border-top: 5px solid black !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: visible !important;
+    }
+    body.printing-batch #batchContainer .summary-sheet {
+      width: auto !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      box-shadow: none !important;
+      border-top: 5px solid black !important;
+    }
+    body.printing-batch .summary-table th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    /* batch fields — auto-scaled to fit ONE page */
+    body.printing-batch .batch-sheet .sheet-title { margin-top: 18px !important; margin-bottom: 18px !important; }
+    body.printing-batch .batch-sheet .field-row { margin-bottom: 16px !important; }
+    body.printing-batch .batch-sheet .reason-section { margin-bottom: 0 !important; }
+    body.printing-batch .batch-sheet .print-spacer { display: block !important; flex: 1 1 auto !important; min-height: 8px !important; }
+    body.printing-batch .batch-sheet .reason-grid { gap: 12px 16px !important; page-break-inside: avoid !important; }
+    body.printing-batch .batch-sheet .reason-print,
+    body.printing-batch .batch-sheet .notes-print {
+      overflow: visible !important; height: auto !important;
+      font-size: var(--fit-fs, 15px) !important;
+      line-height: 1.5 !important;
+    }
+    body.printing-batch .batch-sheet .sig-section { padding-top: 16px !important; margin-bottom: 16px !important; page-break-inside: avoid !important; }
+    body.printing-batch .batch-sheet .notes-block { padding-top: 16px !important; display: block !important; }
+    /* each coaching = exactly one page */
+    body.printing-batch #batchContainer .batch-item { page-break-inside: avoid !important; }
+  }
+</style>
+</head>
+<body>
+<!-- Mini nav bar -->
+<div id="miniNav" class="noPrint" style="
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  background:rgba(255,255,255,.97);backdrop-filter:blur(8px);
+  border-bottom:1px solid #e5e7eb;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;height:38px;
+  font-family:Arial,sans-serif;font-size:12px;
+  box-shadow:0 1px 4px rgba(0,0,0,.07);
+  transform:translateY(-100%);transition:transform .25s;
+">
+  <div style="display:flex;gap:4px;">
+    <button onclick="document.querySelector('.app>.topbar').scrollIntoView({behavior:'smooth'})"
+      style="background:none;border:none;cursor:pointer;padding:4px 10px;border-radius:5px;font-size:12px;font-family:Arial,sans-serif;color:#555;font-weight:600;transition:background .15s"
+      onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">📂 Files</button>
+    <button onclick="document.querySelector('.driverList').closest('.card').scrollIntoView({behavior:'smooth'})"
+      style="background:none;border:none;cursor:pointer;padding:4px 10px;border-radius:5px;font-size:12px;font-family:Arial,sans-serif;color:#555;font-weight:600;transition:background .15s"
+      onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">👥 Drivers</button>
+    <button onclick="(function(){const c=document.getElementById('coachingWrap').closest('.card');const navH=window.scrollY>120?48:8;window.scrollTo({top:c.getBoundingClientRect().top+window.scrollY-navH,behavior:'smooth'});})();"
+      style="background:none;border:none;cursor:pointer;padding:4px 10px;border-radius:5px;font-size:12px;font-family:Arial,sans-serif;color:#555;font-weight:600;transition:background .15s"
+      onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">📄 Coaching</button>
+    <button onclick="document.getElementById('batchWrap').scrollIntoView({behavior:'smooth'})"
+      id="navBatch" style="display:none;background:none;border:none;cursor:pointer;padding:4px 10px;border-radius:5px;font-size:12px;font-family:Arial,sans-serif;color:#555;font-weight:600;transition:background .15s"
+      onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">📚 Book</button>
+  </div>
+  <div id="activeDriverBanner" style="display:none;align-items:center;gap:8px;font-size:11px;color:#666">
+    <span>Editing:</span>
+    <span id="activeDriverName" style="font-weight:700;color:var(--accent)"></span>
+    <button onclick="document.getElementById('profile').scrollIntoView({behavior:'smooth'})"
+      style="background:#fff0f0;border:1px solid #fca5a5;color:var(--accent);border-radius:5px;padding:2px 8px;font-size:10px;font-family:Arial,sans-serif;cursor:pointer;font-weight:700">↑ Profile</button>
+  </div>
+</div>
+
+<div class="app" style="padding-top:18px;">
+  <div class="topbar">
+    <div><h1>Coaching Dashboard</h1><div class="small">DSB · CDF · DVIC Pre-Trip under 90 sec · RTS No Contact Attempted</div></div>
+    <div class="small" id="topDate"></div><div class="small" id="topWeek" style="font-weight:700;color:var(--accent)"></div>
+  </div>
+
+  <div class="card">
+    <div class="uploads">
+      <div class="ubox" id="ubox-dsb">
+        <b>1) DSB / Concessions CSV</b>
+        <div class="hint">Add multiple files (accumulates) · Quality_DSB_DNR / DSP_Delivery_Concessions</div>
+        <a href="https://logistics.amazon.com/performance?pageId=dsp_delivery_concessions&navMenuVariant=external&station=DBA5&companyId=e8bbb660-0684-4a88-b362-66d9fb6aa5c3&tabId=delivery-concessions-weekly-tab&timeFrame=Weekly&to=2026-W26" id="link-dsb"
+          target="_blank"
+          style="font-family:Arial,sans-serif;font-size:10px;color:var(--teal);text-decoration:none;display:inline-block;margin-bottom:6px"
+          onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+          🔗 Download DSB Report
+        </a>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <button type="button" onclick="document.getElementById('file-dsb').click()"
+            style="font-family:Arial,sans-serif;font-size:11px;font-weight:600;padding:5px 12px;
+            border:1px solid #ccc;border-radius:5px;background:white;cursor:pointer;
+            transition:background .15s;white-space:nowrap"
+            onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='white'">
+            Choose Files
+          </button>
+        </div>
+        <input type="file" accept=".csv,.xlsx,.xls" id="file-dsb" multiple onchange="markBox('dsb',this)" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div class="ustat" id="ustat-dsb"></div>
+          <button onclick="clearSlot('dsb')" id="clearBtn-dsb"
+            style="display:none;font-family:Arial,sans-serif;font-size:10px;color:#999;
+            background:none;border:none;cursor:pointer;padding:2px 4px"
+            title="Clear DSB files">✕ clear</button>
+        </div>
+      </div>
+      <div class="ubox" id="ubox-cdf">
+        <b>2) CDF Negative Feedback CSV</b>
+        <div class="hint">Add multiple files (accumulates) · DSP_Customer_Delivery_Feedback_negative</div>
+        <a href="https://logistics.amazon.com/performance?pageId=dsp_customer_delivery_feedback_negative&navMenuVariant=external&station=DBA5&companyId=e8bbb660-0684-4a88-b362-66d9fb6aa5c3&tabId=customer-delivery-feedback-weekly-tab&timeFrame=Weekly&to=2026-W27" id="link-cdf"
+          target="_blank"
+          style="font-family:Arial,sans-serif;font-size:10px;color:var(--teal);text-decoration:none;display:inline-block;margin-bottom:6px;word-break:break-all"
+          onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+          🔗 Download CDF Report
+        </a>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <button type="button" onclick="document.getElementById('file-cdf').click()"
+            style="font-family:Arial,sans-serif;font-size:11px;font-weight:600;padding:5px 12px;
+            border:1px solid #ccc;border-radius:5px;background:white;cursor:pointer;
+            transition:background .15s;white-space:nowrap"
+            onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='white'">
+            Choose Files
+          </button>
+        </div>
+        <input type="file" accept=".csv,.xlsx,.xls" id="file-cdf" multiple onchange="markBox('cdf',this)" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div class="ustat" id="ustat-cdf"></div>
+          <button onclick="clearSlot('cdf')" id="clearBtn-cdf"
+            style="display:none;font-family:Arial,sans-serif;font-size:10px;color:#999;
+            background:none;border:none;cursor:pointer;padding:2px 4px"
+            title="Clear CDF files">✕ clear</button>
+        </div>
+      </div>
+      <div class="ubox" id="ubox-fleet">
+        <b>3) DVIC Pre-Trip under 90 sec</b>
+        <div class="hint">Add multiple files (accumulates) · DVIC_Pre_trip_under90sec</div>
+        <a href="https://logistics.amazon.com/performance?pageId=dsp_supp_reports&navMenuVariant=external&station=DBA5&companyId=e8bbb660-0684-4a88-b362-66d9fb6aa5c3&tabId=safety-dsp-weekly-tab&timeFrame=Weekly&to=2026-W28" id="link-dvic"
+          target="_blank"
+          style="font-family:Arial,sans-serif;font-size:10px;color:var(--teal);text-decoration:none;display:inline-block;margin-bottom:6px"
+          onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+          🔗 Download DVIC Report
+        </a>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <button type="button" onclick="document.getElementById('file-fleet').click()"
+            style="font-family:Arial,sans-serif;font-size:11px;font-weight:600;padding:5px 12px;
+            border:1px solid #ccc;border-radius:5px;background:white;cursor:pointer;
+            transition:background .15s;white-space:nowrap"
+            onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='white'">
+            Choose Files
+          </button>
+        </div>
+        <input type="file" accept=".csv,.xlsx,.xls" id="file-fleet" multiple onchange="markBox('fleet',this)" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div class="ustat" id="ustat-fleet"></div>
+          <button onclick="clearSlot('fleet')" id="clearBtn-fleet"
+            style="display:none;font-family:Arial,sans-serif;font-size:10px;color:#999;
+            background:none;border:none;cursor:pointer;padding:2px 4px"
+            title="Clear DVIC files">✕ clear</button>
+        </div>
+      </div>
+      <div class="ubox" id="ubox-rts">
+        <b>4) RTS — No Contact Attempted</b>
+        <div class="hint">Add multiple files (accumulates) · Quality_RTS_...csv</div>
+        <a href="https://logistics.amazon.com/performance?pageId=dsp_return_to_station&navMenuVariant=external&station=DBA5&companyId=e8bbb660-0684-4a88-b362-66d9fb6aa5c3&tabId=dsp-return-to-station-weekly-tab&timeFrame=Weekly&to=2026-W27" id="link-rts"
+          target="_blank"
+          style="font-family:Arial,sans-serif;font-size:10px;color:var(--teal);text-decoration:none;display:inline-block;margin-bottom:6px"
+          onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+          🔗 Download RTS Report
+        </a>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <button type="button" onclick="document.getElementById('file-rts').click()"
+            style="font-family:Arial,sans-serif;font-size:11px;font-weight:600;padding:5px 12px;
+            border:1px solid #ccc;border-radius:5px;background:white;cursor:pointer;
+            transition:background .15s;white-space:nowrap"
+            onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='white'">
+            Choose Files
+          </button>
+        </div>
+        <input type="file" accept=".csv,.xlsx,.xls" id="file-rts" multiple onchange="markBox('rts',this)" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div class="ustat" id="ustat-rts"></div>
+          <button onclick="clearSlot('rts')" id="clearBtn-rts"
+            style="display:none;font-family:Arial,sans-serif;font-size:10px;color:#999;
+            background:none;border:none;cursor:pointer;padding:2px 4px"
+            title="Clear RTS files">✕ clear</button>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" onclick="loadFiles()">📂 Load Files</button>
+      <button class="btn" onclick="clearAll()">✕ Clear</button>
+      <button class="btn accent" onclick="generateAll()">📚 Generate ALL</button>
+    </div>
+    <div id="status">Waiting for files...</div>
+  </div>
+
+  <div class="card">
+    <div class="stats">
+      <div class="stat"><div class="lbl">Drivers</div><div class="num" id="stDrivers">0</div></div>
+      <div class="stat"><div class="lbl">DSB Records</div><div class="num" id="stDsb">0</div></div>
+      <div class="stat"><div class="lbl">CDF Complaints</div><div class="num" id="stCdf">0</div></div>
+      <div class="stat"><div class="lbl">Under 90 sec</div><div class="num" id="stFleet">0</div></div>
+      <div class="stat"><div class="lbl">RTS No Contact</div><div class="num" id="stRts">0</div></div>
+    </div>
+    <div class="grid">
+      <div>
+        <div class="toolbar">
+          <input id="search" tabindex="1" class="search" placeholder="🔍 Search driver..." oninput="renderList()">
+          <select id="filter" class="sel" onchange="renderList()">
+            <option value="all" id="fAll">All</option>
+            <option value="red" id="fRed">🔴 Red</option>
+            <option value="orange" id="fOrange">🟠 Orange</option>
+            <option value="green" id="fGreen">🟢 Green</option>
+            <option value="dsb" id="fDsb">DSB only</option>
+            <option value="cdf" id="fCdf">CDF only</option>
+            <option value="fleet" id="fFleet">DVIC only</option>
+            <option value="rts" id="fRts">RTS only</option>
+          </select>
+        </div>
+        <div id="driverList" class="driverList"><div class="empty">Load files to see drivers.</div></div>
+      </div>
+      <div id="profile"><div class="empty">Select a driver to see details.</div></div>
+    </div>
+  </div>
+
+  <!-- BATCH (ALL COACHINGS) -->
+  <div class="card" id="batchWrap">
+    <div class="batch-bar">
+      <div><b>📚 Coaching Book</b> — <span id="batchCount">0</span> drivers</div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div class="mode-toggle">
+          <label><input type="radio" name="batchMode" value="consolidated" checked onchange="generateAll()"> One per driver</label>
+          <label><input type="radio" name="batchMode" value="separated" onchange="generateAll()"> One per incident</label>
+        </div>
+        <div class="date-control">
+          <select id="batchDateMode" class="sel" onchange="onBatchDateModeChange()" style="padding:6px 8px;font-size:12px">
+            <option value="today">📅 Today's date</option>
+            <option value="manual">✏️ Manual date</option>
+            <option value="blank">⬜ Leave blank</option>
+          </select>
+          <input type="text" id="batchManualDate" class="search" placeholder="MM/DD/YYYY" maxlength="10"
+                 style="display:none;width:120px;padding:6px 8px;font-size:12px" oninput="applyBatchDate()">
+        </div>
+        <label class="date-toggle"><input type="checkbox" id="batchShowSummary" checked onchange="renderBatch()"> Summary list</label>
+        <button class="btn" onclick="printSummaryOnly()">📋 Print List Only</button>
+        <button class="btn blue" onclick="printBatch()">🖨 Print / Save PDF</button>
+        <button class="btn" onclick="closeBatch()">✕ Close</button>
+      </div>
+    </div>
+    <div id="batchContainer"></div>
+  </div>
+
+  <!-- COACHING SHEET — exact original layout -->
+  <!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Notes expand modal -->
+<div class="modal-overlay" id="notesModal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <h3>📝 Notes — Full View</h3>
+    <textarea id="modal-notes" spellcheck="true" lang="en-US"></textarea>
+    <div class="modal-actions">
+      <button class="copy-btn" onclick="copyModalNotes()">📋 Copy</button>
+      <button class="btn" onclick="applyModalNotes();closeModal()">✓ Apply &amp; Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="card printable">
+    <div class="coaching-wrap visible" id="coachingWrap">
+      <div class="overflow-warn" id="overflowWarn">⚠️ <span id="overflowMsg">Notes may overflow one page — consider shortening before printing.</span></div>
+    <div class="controls-bar">
+        <label class="date-toggle"><input type="checkbox" id="singleShowDate" checked onchange="toggleSingleDate()"> Auto date (or type manually)</label>
+        <button onclick="clearForm()">⟳ Clear</button>
+        <button onclick="printEmpty()">📄 Print Empty</button>
+        <button onclick="printSingleNoDate()">🖨 Print (no date)</button>
+        <button class="cprimary" onclick="printSingle()">🖨 Print / Save PDF</button>
+      </div>
+      <div class="sheet">
+        <div class="sheet-title">Coaching Sheet</div>
+        <div id="backToProfile" class="noPrint" style="display:none;text-align:center;margin-bottom:8px">
+          <button onclick="document.getElementById('profile').scrollIntoView({behavior:'smooth',block:'start'})"
+            style="font-family:Arial,sans-serif;font-size:11px;background:none;border:none;color:var(--teal);cursor:pointer;text-decoration:underline;padding:0">
+            ↑ Back to profile
+          </button>
+        </div>
+
+        <div class="field-row">
+          <span class="field-label">Driver:</span>
+          <div class="driver-wrapper">
+            <input type="text" id="driver-input" tabindex="10" placeholder="Search driver..." autocomplete="off"
+              oninput="filterDrivers()" onfocus="showDropdown()" onkeydown="navDropdown(event)">
+            <div id="driver-dropdown"></div>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <span class="field-label">Date Of Coaching:</span>
+          <div class="date-wrapper">
+            <input class="date-mm" type="text" id="date-mm" tabindex="11" placeholder="MM" maxlength="2" oninput="autoTab(this,'date-dd')">
+            <span class="date-sep">/</span>
+            <input class="date-dd" type="text" id="date-dd" tabindex="12" placeholder="DD" maxlength="2" oninput="autoTab(this,'date-yyyy')">
+            <span class="date-sep">/</span>
+            <input class="date-yyyy" type="text" id="date-yyyy" tabindex="13" placeholder="YYYY" maxlength="4">
+            <span class="cal-icon" title="Pick date" onclick="document.getElementById('date-picker').showPicker?document.getElementById('date-picker').showPicker():document.getElementById('date-picker').click()">📅</span>
+            <input type="date" id="date-picker" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;" oninput="applyPicker(this.value)">
+          </div>
+        </div>
+
+        <div class="reason-section">
+          <span class="field-label">Reason For Coaching:</span>
+          <div class="reason-grid">
+            <label class="reason-item"><input type="checkbox"><span>DA Mishandled Package</span></label>
+            <label class="reason-item"><input type="checkbox"><span>DA was Unprofessional</span></label>
+            <label class="reason-item"><input type="checkbox"><span>DA did not follow my delivery instructions</span></label>
+            <label class="reason-item"><input type="checkbox"><span>Delivered to Wrong Address</span></label>
+            <label class="reason-item"><input type="checkbox"><span>Never Received Delivery</span></label>
+            <label class="reason-item"><input type="checkbox"><span>Received Wrong Item</span></label>
+            <label class="reason-item"><input type="checkbox"><span>CDF Performance Below Standard</span></label>
+            <label class="reason-item"><input type="checkbox"><span>DSB Performance Below Standard</span></label>
+            <label class="reason-item"><input type="checkbox"><span>Failure to Complete Pre-Trip Inspection (90 sec)</span></label>
+            <label class="reason-item"><input type="checkbox"><span>Failure to Turn Off Vehicle Engine</span></label>
+            <label class="reason-item"><input type="checkbox"><span>Delivery Executed 50+ Meters from Drop Point</span></label>
+            <label class="reason-item"><input type="checkbox"><span>Simultaneous Delivery Violation</span></label>
+            <label class="reason-item"><input type="checkbox"><span>Incorrect Scan Usage - Attended Delivery</span></label>
+            <label class="reason-item"><input type="checkbox"><span>RTS — No Contact Attempted</span></label>
+          <label class="reason-item"><input type="checkbox"><span>Other – See Notes</span></label>
+          </div>
+          <textarea class="reason-textarea" id="reason" tabindex="15" placeholder="Additional details..." spellcheck="true" lang="en-US" oninput="autoResize(this);updateReasonCounter();checkOverflow()"></textarea>
+        <div class="char-counter" id="reasonCounter">0 chars</div>
+          <div class="reason-print" id="reason-print"></div>
+        </div>
+
+        <div class="print-spacer"></div>
+
+        <div class="sig-section">
+          <div class="field-row" style="margin-bottom:18px">
+            <span class="field-label">Employee Signature:</span>
+            <input class="sig-input" type="text" id="emp_sig" tabindex="20" placeholder="Employee signature">
+          </div>
+          <div class="field-row" style="margin-bottom:0">
+            <span class="field-label">Manager Signature:</span>
+            <input class="sig-input" type="text" id="mgr_sig" tabindex="21" placeholder="Manager signature">
+          </div>
+        </div>
+
+        <div class="notes-block">
+          <span class="field-label">Notes: <button class="notes-expand-btn" onclick="openModal()">⤢ Expand</button></span>
+          <textarea id="notes" tabindex="22" placeholder="Additional notes..." spellcheck="true" lang="en-US" oninput="autoResize(this);updateNoteCounter();checkOverflow()"></textarea>
+          <div class="char-counter" id="noteCounter">0 chars</div>
+          <div class="notes-print" id="notes-print"></div>
+        </div>
+
+        <div class="disclaimer">This coaching session has been documented to support your growth and performance improvement.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──
+let DATA={dsb:[],cdf:[],fleet:[],rts:[],drivers:{},selected:null};
+let FILES={dsb:[],cdf:[],fleet:[],rts:[]}; // accumulating file lists per slot
+
+// ── DATE ──
+const TD=new Date();
+document.getElementById('topDate').textContent=TD.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+(function(){
+  function getISOWeek(d){
+    const date=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+    date.setUTCDate(date.getUTCDate()+4-(date.getUTCDay()||7));
+    const ys=new Date(Date.UTC(date.getUTCFullYear(),0,1));
+    return Math.ceil((((date-ys)/86400000)+1)/7);
+  }
+  const w=getISOWeek(TD);
+  const el=document.getElementById('topWeek');
+  if(el) el.textContent='Week '+w;
+})();
+function todayStr(){return `${String(TD.getMonth()+1).padStart(2,'0')}/${String(TD.getDate()).padStart(2,'0')}/${TD.getFullYear()}`}
+
+// ── MARK UPLOAD BOX — accumulates files instead of replacing ──
+function markBox(t,inp){
+  const newFiles=Array.from(inp.files||[]);
+  if(!newFiles.length)return;
+  // add only files not already in the list (by name+size)
+  newFiles.forEach(f=>{
+    const dup=FILES[t].some(e=>e.name===f.name && e.size===f.size);
+    if(!dup) FILES[t].push(f);
+  });
+  inp.value=''; // reset so selecting the same file again re-fires change
+  renderFileList(t);
+  const cb=document.getElementById('clearBtn-'+t);
+  if(cb) cb.style.display='block';
+}
+
+function clearSlot(t){
+  FILES[t]=[];
+  DATA[t]=[];
+  document.getElementById('file-'+t).value='';
+  document.getElementById('ustat-'+t).textContent='';
+  document.getElementById('ubox-'+t).classList.remove('loaded');
+  const cb=document.getElementById('clearBtn-'+t);
+  if(cb) cb.style.display='none';
+  // also clear file list UI
+  const fl=document.getElementById('fileList-'+t);
+  if(fl) fl.innerHTML='';
+  const ft=document.getElementById('fileTotal-'+t);
+  if(ft) ft.textContent='';
+  buildDrivers();renderStats();renderList();
+  if(DATA.selected) renderProfile(DATA.selected);
+  toast('✓ '+t.toUpperCase()+' slot cleared');
+}
+
+// Show the running list of added files for a slot
+function renderFileList(t){
+  const box=document.getElementById('ustat-'+t);
+  if(!FILES[t].length){box.innerHTML='';return;}
+  const items=FILES[t].map((f,i)=>
+    `<div class="file-chip">📄 ${f.name} <span class="file-x" onclick="removeFile('${t}',${i})">✕</span></div>`
+  ).join('');
+  box.innerHTML=`<div class="file-list">${items}<div class="file-total">${FILES[t].length} file${FILES[t].length>1?'s':''} ready</div></div>`;
+}
+
+function removeFile(t,i){
+  FILES[t].splice(i,1);
+  renderFileList(t);
+}
+
+// ── PARSE ONE FILE — SheetJS handles both CSV (with BOM) and XLSX ──
+async function parseOneFile(file){
+  const buf=await file.arrayBuffer();
+  let wb;
+  if(file.name.toLowerCase().endsWith('.csv')){
+    const text=new TextDecoder('utf-8').decode(buf).replace(/^\uFEFF/,'');
+    wb=XLSX.read(text,{type:'string',raw:false,dateNF:'yyyy-mm-dd'});
+  }else{
+    wb=XLSX.read(buf,{type:'array',cellDates:true,dateNF:'yyyy-mm-dd'});
+  }
+  for(const s of wb.SheetNames){
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[s],{defval:'',raw:false,dateNF:'yyyy-mm-dd'});
+    if(rows.length>0)return rows;
+  }
+  return[];
+}
+
+// ── PARSE — reads ALL accumulated files for a slot, concatenates rows ──
+async function parseSlot(slot){
+  const files=FILES[slot]||[];
+  if(!files.length)return[];
+  let all=[];
+  for(const file of files){
+    const rows=await parseOneFile(file);
+    all=all.concat(rows);
+  }
+  return all;
+}
+
+// ── DEDUPE — remove repeated records by TBA + Date ──
+function dedupeRows(rows,type){
+  const seen=new Set();
+  const out=[];
+  for(const r of rows){
+    const tba=g(r,'Tracking ID')||'';
+    // collect all possible date fields for this record
+    let date='';
+    if(type==='dsb'){
+      date=fmtDate(g(r,'Delivery Date'))||fmtDate(g(r,'Pickup Date'))||fmtDate(g(r,'Concession Date'))||g(r,'Date')||'';
+    }else if(type==='cdf'){
+      date=fmtDate(g(r,'Delivery Date'))||'';
+    }else if(type==='rts'){
+      // RTS: use TBA + driver name + date as key (TBA alone is sufficient)
+      const da=g(r,'Delivery Associate ','Delivery Associate')||'';
+      date=(g(r,'Planned Delivery Date')||'')+'|'+da;
+    }else{ // fleet/DVIC — no TBA, use date+vin+start
+      date=(g(r,'start_date')||'')+'|'+(g(r,'vin')||'')+'|'+(g(r,'start_time')||'');
+    }
+    const key=(tba+'||'+date).toLowerCase().trim();
+    // if no tba AND no date, keep it (can't dedupe safely)
+    if(key==='||'){out.push(r);continue;}
+    if(seen.has(key))continue;
+    seen.add(key);
+    out.push(r);
+  }
+  return out;
+}
+
+// ── GET FIELD — handles trailing spaces and quotes in Amazon CSV headers ──
+// Column aliases — maps logical names to possible CSV header variants
+const COL_ALIASES={
+  'Tracking ID':['Tracking ID','Order ID','Package ID','TBA','tracking_id','order_id','package_id','Shipment ID'],
+  'Delivery Date':['Delivery Date','delivery_date','Date of Delivery','Ship Date','Delivered Date'],
+  'Delivery Associate':['Delivery Associate','Delivery Associate ','Delivery Associate Name','DA Name','transporter_name','Driver Name','Associate Name'],
+  'Impact DC DPMO':['Impact DC DPMO','Impacts Scorecard','Impacts DC DPMO'],
+};
+function g(row,...keys){
+  for(const k of keys){
+    // expand aliases
+    const toTry=[k,...(COL_ALIASES[k]||[])];
+    for(const key of toTry){
+      // exact match
+      if(row[key]!==undefined&&String(row[key]).trim()!=='')return String(row[key]).trim();
+      // fuzzy: trim spaces AND strip quotes
+      const kClean=key.replace(/['"]/g,'').trim().toLowerCase();
+      for(const rk of Object.keys(row)){
+        const rkClean=rk.replace(/['"]/g,'').trim().toLowerCase();
+        if(rkClean===kClean&&String(row[rk]).trim()!=='')return String(row[rk]).trim();
+      }
+    }
+  }
+  return'';
+}
+function norm(v){return String(v??'').trim()}
+function keyName(n){
+  return norm(n).toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // strip accents
+    .replace(/[.,'']/g,'')                            // strip punctuation
+    .replace(/\s+/g,' ')                              // collapse spaces
+    .trim();
+}
+
+// Identity key = first word + last word only (ignores middle names).
+// So "Andrew Lee Gardner" and "Andrew Gardner" map to the same person.
+function identityKey(n){
+  const clean=keyName(n);
+  const parts=clean.split(' ').filter(Boolean);
+  if(parts.length<=1) return clean;
+  return parts[0]+' '+parts[parts.length-1];
+}
+
+// ── LOAD FILES ──
+async function loadFiles(){
+  const st=document.getElementById('status');
+  st.className='';
+  // Show progress bar
+  st.innerHTML=`<div style="font-family:Arial,sans-serif;font-size:12px;margin-bottom:6px">⏳ Reading files...</div>
+    <div style="height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden">
+      <div id="loadBar" style="height:100%;background:var(--teal);border-radius:3px;width:0%;transition:width .3s"></div>
+    </div>`;
+  const setBar=p=>{const b=document.getElementById('loadBar');if(b)b.style.width=p+'%';};
+  try{
+    setBar(10);
+    const rawDsb  =await parseSlot('dsb'); setBar(30);
+    const rawCdf  =await parseSlot('cdf'); setBar(55);
+    const rawFleet=await parseSlot('fleet'); setBar(75);
+    const rawRts  =await parseSlot('rts'); setBar(90);
+
+    // Dedupe by TBA + Date so repeated records across files only count once
+    DATA.dsb  =dedupeRows(rawDsb,'dsb');
+    DATA.cdf  =dedupeRows(rawCdf,'cdf');
+    DATA.fleet=dedupeRows(rawFleet,'fleet');
+    // RTS: filter to only Impact DC DPMO=Y + No Exemption Applied
+    DATA.rts  =dedupeRows(rawRts.filter(r=>{
+      // Support both column name variants
+      const dpmo=String(g(r,'Impact DC DPMO','Impacts Scorecard')||'').trim().toUpperCase();
+      if(dpmo!=='Y') return false;
+      // Additional Information must be non-empty (means no contact was attempted)
+      const info=String(g(r,'Additional Information')||'').trim();
+      return info!=='' && info!=='--' && info.toLowerCase()!=='nan';
+    }),'rts');
+
+    const dupInfo={
+      dsb:rawDsb.length-DATA.dsb.length,
+      cdf:rawCdf.length-DATA.cdf.length,
+      fleet:rawFleet.length-DATA.fleet.length,
+      rts:rawRts.length-DATA.rts.length
+    };
+
+    buildDrivers();renderStats();renderList();
+    // Detect report week from data
+    detectReportWeek();
+
+    ['dsb','cdf','fleet','rts'].forEach(t=>{
+      const nf=FILES[t].length;
+      const count=t==='dsb'?DATA.dsb.length:t==='cdf'?DATA.cdf.length:t==='rts'?DATA.rts.length:DATA.fleet.length;
+      if(nf){
+        document.getElementById('ubox-'+t).classList.add('loaded');
+        const _cb=document.getElementById('clearBtn-'+t);if(_cb)_cb.style.display='block';
+        const dups=dupInfo[t]>0?`, ${dupInfo[t]} duplicates removed`:'';
+        document.getElementById('ustat-'+t).innerHTML=`<div class="file-total">✓ ${nf} file${nf>1?'s':''} loaded — ${count} records${dups}</div>`;
+      }
+    });
+
+    st.textContent=`✓ Loaded — DSB: ${DATA.dsb.length} | CDF: ${DATA.cdf.length} | DVIC: ${DATA.fleet.length} | RTS: ${DATA.rts.length} | Drivers: ${Object.keys(DATA.drivers).length}`;
+    st.className='ok';
+  }catch(err){
+    st.textContent='✗ Error: '+err.message;
+    st.className='err';
+    console.error(err);
+  }
+}
+
+// ── BUILD DRIVERS ──
+function addDriver(name){
+  name=norm(name);if(!name)return null;
+  // Skip transporter IDs (all caps+numbers, no spaces, 8+ chars)
+  if(/^[A-Z0-9]{8,}$/.test(name))return null;
+  // Skip very short values
+  if(name.length<3)return null;
+  const k=identityKey(name); // first + last name, merges middle-name variants
+  if(!DATA.drivers[k]){
+    DATA.drivers[k]={name,dsb:[],cdf:[],fleet:[],rts:[]};
+  }else{
+    // keep the longest (most complete) version of the name for display
+    if(name.length>DATA.drivers[k].name.length) DATA.drivers[k].name=name;
+  }
+  return DATA.drivers[k];
+}
+
+// Find the name in any row by looking for the column that contains a real person name
+// A real name: has at least one space OR mixed case, and is NOT an ID pattern
+function findName(row){
+  // Try known name columns first (all variations)
+  const nameKeys=[
+    'Delivery Associate Name',
+    'Delivery Associate ',  // with trailing space
+    'Delivery Associate',   // without trailing space
+    'DA Name',
+    'transporter_name',
+    'Driver Name',
+  ];
+  for(const k of nameKeys){
+    // exact key match
+    if(row[k]!==undefined){
+      const v=String(row[k]).trim();
+      if(v.length>3&&!/^[A-Z0-9]{8,}$/.test(v))return v;
+    }
+    // fuzzy: strip spaces from both sides of key
+    for(const rk of Object.keys(row)){
+      if(rk.trim()===k.trim()){
+        const v=String(row[rk]).trim();
+        if(v.length>3&&!/^[A-Z0-9]{8,}$/.test(v))return v;
+      }
+    }
+  }
+  // Last resort: scan all values for something that looks like a person name
+  for(const rk of Object.keys(row)){
+    const v=String(row[rk]).trim();
+    // Person name: has space, mixed case, 5-50 chars, not a date/number
+    if(v.includes(' ')&&/[a-z]/.test(v)&&/[A-Z]/.test(v)&&v.length>=5&&v.length<=60&&!/^\d/.test(v)&&!v.includes('-')){
+      return v;
+    }
+  }
+  return'';
+}
+
+function buildDrivers(){
+  DATA.drivers={};
+  DATA.dsb.forEach(r=>{
+    const name=findName(r);
+    const d=addDriver(name);if(d)d.dsb.push(r);
+  });
+  DATA.cdf.forEach(r=>{
+    const name=findName(r);
+    const d=addDriver(name);if(d)d.cdf.push(r);
+  });
+  DATA.fleet.forEach(r=>{
+    const name=g(r,'transporter_name')||findName(r);
+    const d=addDriver(name);if(d)d.fleet.push(r);
+  });
+  DATA.rts.forEach(r=>{
+    const name=g(r,'Delivery Associate ','Delivery Associate')||findName(r);
+    const d=addDriver(name);if(d){if(!d.rts)d.rts=[];d.rts.push(r);}
+  });
+  console.log('Drivers built:',Object.keys(DATA.drivers).length);
+  if(DATA.dsb.length>0){console.log('DSB keys:',Object.keys(DATA.dsb[0]));console.log('DSB row0 name:',findName(DATA.dsb[0]));}
+  if(DATA.cdf.length>0){console.log('CDF keys:',Object.keys(DATA.cdf[0]));console.log('CDF row0 name:',findName(DATA.cdf[0]));}
+}
+
+// ── FORMAT DATE — handles Excel serial numbers and string dates ──
+function fmtDate(v){
+  if(!v||v==='')return'—';
+  const s=String(v).trim();
+  // Already a proper date string
+  if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.substring(0,10);
+  if(/^\d{2}\/\d{2}\/\d{4}/.test(s))return s.substring(0,10);
+  // Excel serial number (e.g. 46180.695)
+  const n=parseFloat(s);
+  if(!isNaN(n)&&n>40000&&n<50000){
+    const d=new Date((n-25569)*86400*1000);
+    return d.toISOString().substring(0,10);
+  }
+  return s.substring(0,10)||'—';
+}
+function is1(v){return String(v).trim()==='1'||v===1||v===true;}
+function dsbViols(r){
+  const o=[];
+  if(is1(g(r,'Simultaneous Deliveries')))o.push('Simultaneous Deliveries');
+  if(is1(g(r,'Delivered > 50 m')))o.push('Delivered > 50 Meters');
+  if(is1(g(r,'Incorrect Scan Usage - Attended Delivery')))o.push('Incorrect Scan - Attended');
+  if(is1(g(r,'Incorrect Scan Usage - Unattended Delivery')))o.push('Incorrect Scan - Unattended');
+  if(is1(g(r,'No POD on Delivery')))o.push('No POD on Delivery');
+  if(is1(g(r,'Scanned - Not Delivered - Not Returned')))o.push('Scanned Not Delivered Not Returned');
+  return o;
+}
+function cdfViols(r){
+  const fields=['DA Mishandled Package','DA was Unprofessional','DA did not follow my delivery instructions','Delivered to Wrong Address','Never Received Delivery','Received Wrong Item'];
+  const o=fields.filter(f=>is1(g(r,f)));
+  const det=g(r,'Feedback Details');
+  if(!o.length&&det)o.push(det);
+  return o.length?o:['Negative Feedback'];
+}
+function allReasons(d){
+  const s=new Set();
+  d.dsb.forEach(r=>dsbViols(r).forEach(x=>s.add(x)));
+  d.cdf.forEach(r=>cdfViols(r).forEach(x=>s.add(x)));
+  if(d.dsb.length)s.add('DSB Performance Below Standard');
+  if(d.cdf.length)s.add('CDF Performance Below Standard');
+  if(d.fleet.length)s.add('Failure to Complete Pre-Trip Inspection (90 sec)');
+  if(d.rts&&d.rts.length)s.add('RTS — No Contact Attempted');
+  return[...s];
+}
+function severity(d){
+  const dsbImp=d.dsb.filter(r=>is1(g(r,'Impacts DSB'))).length;
+  const rtsLen=(d.rts||[]).length;
+  const t=dsbImp+d.cdf.length+d.fleet.length+rtsLen;
+  if(t>=3||d.cdf.length>=2||d.fleet.length>=2||rtsLen>=2)return'red';
+  if(t>=1)return'orange';
+  return'green';
+}
+
+// ── DETECT REPORT WEEK ──
+function detectReportWeek(){
+  // Try to find a date in loaded data
+  let dateStr='';
+  const tryDate=(r,keys)=>{
+    for(const k of keys){
+      const v=g(r,k);
+      if(v&&v.length>=8){return v;}
+    }
+    return'';
+  };
+  if(DATA.dsb.length)      dateStr=tryDate(DATA.dsb[0],['Concession Date','Delivery Date','Pickup Date']);
+  if(!dateStr&&DATA.cdf.length)  dateStr=tryDate(DATA.cdf[0],['Delivery Date','Scorecard Reporting week']);
+  if(!dateStr&&DATA.fleet.length)dateStr=tryDate(DATA.fleet[0],['start_date']);
+  if(!dateStr&&DATA.rts.length)  dateStr=tryDate(DATA.rts[0],['Planned Delivery Date']);
+
+  if(!dateStr)return;
+  // Parse the date and get ISO week
+  let d;
+  if(/\d{4}-W\d{2}/.test(dateStr)){
+    // Already a week string
+    const el=document.getElementById('topWeek');
+    if(el) el.textContent=dateStr;
+    return;
+  }
+  try{d=new Date(dateStr);}catch(e){return;}
+  if(isNaN(d))return;
+  function getISOWeek(dt){
+    const date=new Date(Date.UTC(dt.getFullYear(),dt.getMonth(),dt.getDate()));
+    date.setUTCDate(date.getUTCDate()+4-(date.getUTCDay()||7));
+    const ys=new Date(Date.UTC(date.getUTCFullYear(),0,1));
+    return{y:date.getUTCFullYear(),w:Math.ceil((((date-ys)/86400000)+1)/7)};
+  }
+  const {y,w}=getISOWeek(d);
+  const el=document.getElementById('topWeek');
+  if(el) el.textContent=`Report: ${y}-W${String(w).padStart(2,'0')}`;
+}
+
+// ── STATS ──
+function renderStats(){
+  document.getElementById('stDrivers').textContent=Object.keys(DATA.drivers).length;
+  document.getElementById('stDsb').textContent=DATA.dsb.length;
+  document.getElementById('stCdf').textContent=DATA.cdf.length;
+  document.getElementById('stFleet').textContent=DATA.fleet.length;
+  const stRts=document.getElementById('stRts');if(stRts)stRts.textContent=DATA.rts.length;
+  // Update filter option counts
+  const drivers=Object.values(DATA.drivers);
+  const nRed=drivers.filter(d=>severity(d)==='red').length;
+  const nOrange=drivers.filter(d=>severity(d)==='orange').length;
+  const nGreen=drivers.filter(d=>severity(d)==='green').length;
+  const nDsb=drivers.filter(d=>d.dsb.filter(r=>is1(g(r,'Impacts DSB'))).length>0).length;
+  const nCdf=drivers.filter(d=>d.cdf.length>0).length;
+  const nFleet=drivers.filter(d=>d.fleet.length>0).length;
+  const nRtsD=drivers.filter(d=>(d.rts||[]).length>0).length;
+  const setOpt=(id,label,n)=>{const el=document.getElementById(id);if(el&&n>0)el.textContent=label+' ('+n+')';};
+  setOpt('fAll','All',drivers.length);
+  setOpt('fRed','🔴 Red',nRed);
+  setOpt('fOrange','🟠 Orange',nOrange);
+  setOpt('fGreen','🟢 Green',nGreen);
+  setOpt('fDsb','DSB only',nDsb);
+  setOpt('fCdf','CDF only',nCdf);
+  setOpt('fFleet','DVIC only',nFleet);
+  setOpt('fRts','RTS only',nRtsD);
+}
+
+// ── DRIVER LIST ──
+function renderList(){
+  const q=keyName(document.getElementById('search').value);
+  const f=document.getElementById('filter').value;
+  let arr=Object.values(DATA.drivers).sort((a,b)=>{
+    const sv={red:0,orange:1,green:2};
+    return sv[severity(a)]-sv[severity(b)]||a.name.localeCompare(b.name);
+  });
+  arr=arr.filter(d=>{
+    if(q && !keyName(d.name).includes(q)) return false;
+    if(f==='all') return true;
+    if(f==='red'||f==='orange'||f==='green') return severity(d)===f;
+    if(f==='dsb') return d.dsb.filter(r=>is1(g(r,'Impacts DSB'))).length>0;
+    if(f==='cdf') return d.cdf.length>0;
+    if(f==='fleet') return d.fleet.length>0;
+    if(f==='rts') return (d.rts||[]).length>0;
+    return true;
+  });
+  const box=document.getElementById('driverList');
+  if(!arr.length){box.innerHTML='<div class="empty">No drivers found.</div>';return;}
+  const _searchQ=document.getElementById('search').value;
+  box.innerHTML=arr.map(d=>{
+    const sev=severity(d);
+    const active=(DATA.selected&&identityKey(DATA.selected.name)===identityKey(d.name))?'active':'';
+    const sevLbl={red:'🔴 RED',orange:'🟠 ORANGE',green:'🟢 OK'}[sev];
+    return`<div class="driverItem ${active} sev-${sev}${[d.dsb.filter(r=>is1(g(r,'Impacts DSB'))).length>0,d.cdf.length>0,d.fleet.length>0,(d.rts||[]).length>0].filter(Boolean).length>=2?' multi-viol':''}" onclick="selectDriver('${identityKey(d.name).replace(/'/g,"\\'")}')">
+      <div style="flex:1;min-width:0">
+        <div class="driverName">${highlightMatch(d.name, _searchQ)}</div>
+        <div class="badges">
+          <span class="badge b-${sev}">${sevLbl}</span>
+          ${d.dsb.filter(r=>is1(g(r,'Impacts DSB'))).length?`<span class="badge b-red">DSB ${d.dsb.filter(r=>is1(g(r,'Impacts DSB'))).length}</span>`:''}
+          ${d.cdf.length?`<span class="badge b-orange">CDF ${d.cdf.length}</span>`:''}
+          ${d.fleet.length?`<span class="badge b-teal">90s ×${d.fleet.length}</span>`:''}
+          ${(d.rts&&d.rts.length)?`<span class="badge b-orange">RTS ×${d.rts.length}</span>`:''}
+        </div>
+      </div>
+      <button class="btn-coaching" onclick="event.stopPropagation();goCoaching('${identityKey(d.name).replace(/'/g,"\\'")}')">📋 Coaching</button>
+    </div>`;
+  }).join('');
+  // keep the selected driver visible within the list (without scrolling the whole page)
+  const activeEl=box.querySelector('.driverItem.active');
+  if(activeEl){
+    const top=activeEl.offsetTop - box.offsetTop;
+    if(top < box.scrollTop || top > box.scrollTop + box.clientHeight){
+      box.scrollTop = top - 20;
+    }
+  }
+}
+
+// ── SELECT DRIVER ──
+function selectDriver(k){
+  DATA.selected=DATA.drivers[k];
+  renderList();
+  renderProfile(DATA.selected);
+  fillCoaching(DATA.selected);
+}
+
+// ── GO COACHING ──
+function goCoaching(k){
+  const d=DATA.drivers[k];
+  if(!d){console.warn('goCoaching: driver not found for key',k);return;}
+  DATA.selected=d;
+  renderList();
+  renderProfile(d);
+  fillCoaching(d);
+  const card=document.getElementById('coachingWrap').closest('.card');
+  // Scroll with offset to avoid being hidden under the sticky miniNav (38px) + small buffer
+  const navH=(document.getElementById('miniNav')&&window.scrollY>120)?48:8;
+  const top=card.getBoundingClientRect().top+window.scrollY-navH;
+  window.scrollTo({top,behavior:'smooth'});
+  // Flash the coaching card so user knows they arrived
+  setTimeout(()=>{
+    card.style.transition='box-shadow .2s';
+    card.style.boxShadow='0 0 0 3px var(--accent)';
+    setTimeout(()=>card.style.boxShadow='',700);
+  },400);
+  // Show "back to profile" link and active driver banner
+  const bp=document.getElementById('backToProfile');
+  if(bp) bp.style.display='block';
+  updateActiveDriverBanner(d.name);
+}
+
+// ── TABLE HELPER ──
+// `delType` (optional): if set, adds a delete X column that removes the row from DATA.selected[delType]
+function tbl(rows,cols,delType){
+  if(!rows.length)return'<div class="empty">No records.</div>';
+  const head=cols.map(c=>`<th>${c.l}</th>`).join('')+(delType?'<th class="noPrint" style="width:40px">Del</th>':'');
+  const body=rows.map(r=>{
+    const cells=cols.map(c=>`<td>${norm(c.fn?c.fn(r):g(r,c.k))}</td>`).join('');
+    let del='';
+    if(delType){
+      // find this row's index in the original array
+      const arr=DATA.selected[delType];
+      const idx=arr.indexOf(r);
+      del=`<td class="noPrint" style="text-align:center"><button class="inc-x" onclick="removeIncident('${delType}',${idx})" title="Remove this incident">✕</button></td>`;
+    }
+    return`<tr>${cells}${del}</tr>`;
+  }).join('');
+  return`<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+// Remove a single incident from the selected driver, update profile + coaching
+function removeIncident(type,idx){
+  const arr=DATA.selected[type];
+  if(!arr||idx<0||idx>=arr.length)return;
+  arr.splice(idx,1);
+  renderProfile(DATA.selected);
+  fillCoaching(DATA.selected);
+  renderList(); // update badges/severity in the list too
+  // If the Coaching Book is open, regenerate it silently (no scroll jump)
+  if(document.getElementById('batchWrap').classList.contains('active')){
+    generateAll(true);
+  }
+}
+
+// ── TABLE WITH DELETE BUTTON ──
+function tblDel(rows,cols,source,dk){
+  if(!rows.length)return'<div class="empty">No records.</div>';
+  const esc=dk.replace(/'/g,"\\'");
+  const header=`<thead><tr>${cols.map(c=>`<th>${c.l}</th>`).join('')}<th style="width:36px;text-align:center">DEL</th></tr></thead>`;
+  const body=rows.map((r,i)=>{
+    const cells=cols.map(c=>`<td>${norm(c.fn?c.fn(r):g(r,c.k))}</td>`).join('');
+    return`<tr>${cells}<td style="text-align:center"><button class="del-btn" onclick="deleteRow('${source}','${esc}',${i})">✕</button></td></tr>`;
+  }).join('');
+  return`<table><${header}<tbody>${body}</tbody></table>`;
+}
+function deleteRow(source,dk,vi){
+  const d=DATA.drivers[dk];if(!d)return;
+  const pool=source==='dsb'?d.dsb.filter(r=>is1(g(r,'Impacts DSB'))):source==='cdf'?d.cdf:d.fleet;
+  const target=pool[vi];if(!target)return;
+  const arr=source==='dsb'?d.dsb:source==='cdf'?d.cdf:d.fleet;
+  const global=source==='dsb'?DATA.dsb:source==='cdf'?DATA.cdf:DATA.fleet;
+  arr.splice(arr.indexOf(target),1);
+  global.splice(global.indexOf(target),1);
+  renderStats();renderList();renderProfile(d);fillCoaching(d);
+}
+
+// ── RENDER PROFILE ──
+function renderProfile(d){
+  const reasons=allReasons(d);
+  const dk=identityKey(d.name);
+  document.getElementById('profile').innerHTML=`
+    <div class="profileHead">
+      <div><h2>${d.name}</h2>
+      <div class="small">DSB: ${d.dsb.length} &nbsp;|&nbsp; CDF: ${d.cdf.length} &nbsp;|&nbsp; DVIC: ${d.fleet.length}</div></div>
+      <div class="reasonPills">${reasons.map(x=>`<span class="badge b-teal">${x}</span>`).join('')}</div>
+    </div>
+    <div class="actions" style="margin-bottom:14px">
+      <button class="btn accent" onclick="goCoaching('${dk}')">📋 Generate Coaching Sheet</button>
+      <button class="btn blue" onclick="goCoaching('${dk}');setTimeout(()=>printSingle(),300)">🖨 Print</button>
+    </div>
+
+    <div class="secTitle">DSB Impact Records (${d.dsb.filter(r=>is1(g(r,'Impacts DSB'))).length} of ${d.dsb.length} impact DSB)</div>
+    ${tblDel(d.dsb.filter(r=>is1(g(r,'Impacts DSB'))),[
+      {l:'Delivery Date',   fn:r=>fmtDate(g(r,'Delivery Date','Pickup Date','Concession Date'))},
+      {l:'Concession Date', fn:r=>fmtDate(g(r,'Concession Date'))},
+      {l:'Tracking ID / TBA', k:'Tracking ID'},
+      {l:'Delivery Type',   k:'Delivery Type'},
+      {l:'Violations',      fn:r=>{
+        const v=dsbViols(r);
+        return v.length?v.map(x=>`<span class="flag f-r">${x}</span>`).join('<br>'):'<span style="color:#aaa">—</span>';
+      }}
+    ],'dsb',identityKey(d.name))}
+
+    <div class="secTitle">CDF Negative Feedback (${d.cdf.length} records)</div>
+    ${tblDel(d.cdf,[
+      {l:'Delivery Date', fn:r=>fmtDate(g(r,'Delivery Date'))},
+      {l:'TBA / Tracking ID', k:'Tracking ID'},
+      {l:'Feedback Type', fn:r=>{const v=cdfViols(r);return v.map(x=>`<span class="flag f-o">${x}</span>`).join(' ');}}
+    ],'cdf',identityKey(d.name))}
+
+    <div class="secTitle">DVIC Pre-Trip Inspection under 90 sec (${d.fleet.length} records)</div>
+    ${tblDel(d.fleet,[
+      {l:'Date',k:'start_date'},
+      {l:'VIN',k:'vin'},
+      {l:'Start',fn:r=>String(g(r,'start_time')).substring(11)||g(r,'start_time')},
+      {l:'End',fn:r=>String(g(r,'end_time')).substring(11)||g(r,'end_time')},
+      {l:'Duration',fn:r=>{const dur=parseInt(g(r,'duration')||'0');return`<span class="flag ${dur<90?'f-r':'f-t'}">${dur} sec</span>`;}}
+    ],'fleet',identityKey(d.name))}
+
+    <div class="secTitle">RTS — No Contact Attempted (${(d.rts||[]).length} records)</div>
+    ${tblDel((d.rts||[]),[
+      {l:'Planned Date',     fn:r=>fmtDate(g(r,'Planned Delivery Date'))},
+      {l:'TBA / Tracking ID',k:'Tracking ID'},
+      {l:'RTS Code',         fn:r=>`<span class="flag f-o">${g(r,'DA Selected RTS Code')}</span>`},
+      {l:'Additional Info',  k:'Additional Information'},
+      {l:'Service Area',     k:'Service Area'}
+    ],'rts',identityKey(d.name))}
+
+    <div class="secTitle">Coaching Notes Preview &nbsp;<button class="copy-btn" onclick="copyNotes()">📋 Copy</button></div>
+    <div class="preview">${makeNotes(d)}</div>`;
+}
+
+// ── MAKE NOTES ──
+function makeNotes(d){
+  const lines=[];
+
+  // DSB — same logic as fillCoaching
+  const impDSB=d.dsb.filter(r=>
+    is1(g(r,'Impacts DSB'))||is1(g(r,'Simultaneous Deliveries'))||is1(g(r,'Delivered > 50 m'))||
+    is1(g(r,'Incorrect Scan Usage - Attended Delivery'))||is1(g(r,'Incorrect Scan Usage - Unattended Delivery'))||
+    is1(g(r,'No POD on Delivery'))||is1(g(r,'Scanned - Not Delivered - Not Returned'))
+  );
+  if(impDSB.length){
+    lines.push('DSB Records:');
+    impDSB.forEach(r=>{
+      const tba      = g(r,'Tracking ID')||'—';
+      const delDate  = fmtDate(g(r,'Delivery Date'));
+      const pickDate = fmtDate(g(r,'Pickup Date'));
+      const concDate = fmtDate(g(r,'Concession Date'));
+      const date     = g(r,'Date');
+      const type     = g(r,'Delivery Type')||'—';
+      const viols    = dsbViols(r);
+      const dates=[];
+      if(date&&date!=='—')  dates.push(`Date: ${date}`);
+      if(delDate!=='—')     dates.push(`Delivery: ${delDate}`);
+      if(pickDate!=='—')    dates.push(`Pickup: ${pickDate}`);
+      if(concDate!=='—')    dates.push(`Concession: ${concDate}`);
+      const dateStr=dates.length?dates.join(' | '):'—';
+      const violStr=viols.length?viols.join(', '):'DSB Impact';
+      lines.push(`  • TBA: ${tba} | ${dateStr} | Type: ${type} | Violation: ${violStr}`);
+    });
+  }
+
+  // CDF
+  if(d.cdf.length){
+    if(impDSB.length) lines.push('');
+    lines.push('CDF Records:');
+    d.cdf.forEach(r=>{
+      const tba   = g(r,'Tracking ID')||'—';
+      const date  = fmtDate(g(r,'Delivery Date'));
+      const viols = cdfViols(r).join(', ')||'Negative Feedback';
+      const detail= g(r,'Feedback Details');
+      lines.push(`  • TBA: ${tba} | Date: ${date} | ${viols}${detail?' — '+detail:''}`);
+    });
+  }
+
+  // DVIC
+  if(d.fleet.length){
+    if(impDSB.length||d.cdf.length) lines.push('');
+    lines.push('DVIC Pre-Trip Inspection under 90 sec:');
+    d.fleet.forEach(r=>{
+      const dt   = g(r,'start_date');
+      const dur  = g(r,'duration');
+      const vin  = g(r,'vin');
+      const start= String(g(r,'start_time')).length>10?String(g(r,'start_time')).substring(11):g(r,'start_time');
+      const end  = String(g(r,'end_time')).length>10?String(g(r,'end_time')).substring(11):g(r,'end_time');
+      lines.push(`  • Date: ${dt} | Start: ${start} | End: ${end} | Duration: ${dur} sec | VIN: ${vin}`);
+    });
+  }
+
+  // RTS
+  if(d.rts&&d.rts.length){
+    if(lines.length) lines.push('');
+    lines.push('RTS — No Contact Attempted:');
+    d.rts.forEach(r=>{
+      const tba  = g(r,'Tracking ID')||'—';
+      const date = fmtDate(g(r,'Planned Delivery Date'));
+      const code = g(r,'DA Selected RTS Code')||'—';
+      const info=g(r,'Additional Information');
+      lines.push(`  • TBA: ${tba} | Date: ${date} | RTS: ${code}${info&&info!=='--'?' — '+info:''}`);
+    });
+  }
+
+  lines.push('\nDA acknowledged coaching. This session is intended to support continuous improvement.');
+  return lines.join('\n');
+}
+
+// ── FILL COACHING ──
+// ── BUILD COACHING DATA (reusable for single + batch) ──
+function buildCoachingData(d){
+  const impDSB = d.dsb.filter(r =>
+    is1(g(r,'Impacts DSB')) || is1(g(r,'Simultaneous Deliveries')) ||
+    is1(g(r,'Delivered > 50 m')) || is1(g(r,'Incorrect Scan Usage - Attended Delivery')) ||
+    is1(g(r,'Incorrect Scan Usage - Unattended Delivery')) || is1(g(r,'No POD on Delivery')) ||
+    is1(g(r,'Scanned - Not Delivered - Not Returned'))
+  );
+  const toCheck = new Set();
+  impDSB.forEach(r=>{
+    if(is1(g(r,'Simultaneous Deliveries')))                    toCheck.add('Simultaneous Delivery Violation');
+    if(is1(g(r,'Delivered > 50 m')))                          toCheck.add('Delivery Executed 50+ Meters from Drop Point');
+    if(is1(g(r,'Incorrect Scan Usage - Attended Delivery'))||
+       is1(g(r,'Incorrect Scan Usage - Unattended Delivery')))toCheck.add('DSB Performance Below Standard');
+    if(is1(g(r,'No POD on Delivery')))                        toCheck.add('DSB Performance Below Standard');
+    if(is1(g(r,'Scanned - Not Delivered - Not Returned')))     toCheck.add('DSB Performance Below Standard');
+  });
+  if(impDSB.length)  toCheck.add('DSB Performance Below Standard');
+  if(d.cdf.length)   toCheck.add('CDF Performance Below Standard');
+  if(d.fleet.length) toCheck.add('Failure to Complete Pre-Trip Inspection (90 sec)');
+  if(d.rts&&d.rts.length) toCheck.add('RTS — No Contact Attempted');
+  d.cdf.forEach(r=>{
+    if(is1(g(r,'DA Mishandled Package')))                      toCheck.add('DA Mishandled Package');
+    if(is1(g(r,'DA was Unprofessional')))                      toCheck.add('DA was Unprofessional');
+    if(is1(g(r,'DA did not follow my delivery instructions'))) toCheck.add('DA did not follow my delivery instructions');
+    if(is1(g(r,'Delivered to Wrong Address')))                 toCheck.add('Delivered to Wrong Address');
+    if(is1(g(r,'Never Received Delivery')))                    toCheck.add('Never Received Delivery');
+    if(is1(g(r,'Received Wrong Item')))                        toCheck.add('Received Wrong Item');
+  });
+
+  const lines=[];
+  if(impDSB.length){
+    lines.push('DSB Records:');
+    impDSB.forEach(r=>{
+      const tba=g(r,'Tracking ID')||'—';
+      const delDate=fmtDate(g(r,'Delivery Date')),pickDate=fmtDate(g(r,'Pickup Date')),concDate=fmtDate(g(r,'Concession Date'));
+      const date=g(r,'Date'),type=g(r,'Delivery Type')||'—',viols=dsbViols(r);
+      const dates=[];
+      if(date&&date!=='—')dates.push(`Date: ${date}`);
+      if(delDate!=='—')dates.push(`Delivery: ${delDate}`);
+      if(pickDate!=='—')dates.push(`Pickup: ${pickDate}`);
+      if(concDate!=='—')dates.push(`Concession: ${concDate}`);
+      const dateStr=dates.length?dates.join(' | '):'—';
+      const violStr=viols.length?viols.join(', '):'DSB Impact';
+      lines.push(`  • TBA: ${tba} | ${dateStr} | Type: ${type} | Violation: ${violStr}`);
+    });
+  }
+  if(d.cdf.length){
+    lines.push('');lines.push('CDF Records:');
+    d.cdf.forEach(r=>{
+      const tba=g(r,'Tracking ID')||'—',date=fmtDate(g(r,'Delivery Date'));
+      const viols=cdfViols(r).join(', ')||'Negative Feedback',detail=g(r,'Feedback Details');
+      lines.push(`  • TBA: ${tba} | Date: ${date} | ${viols}${detail?' — '+detail:''}`);
+    });
+  }
+  if(d.fleet.length){
+    lines.push('');lines.push('DVIC Pre-Trip Inspection under 90 sec:');
+    d.fleet.forEach(r=>{
+      const dt=g(r,'start_date'),dur=g(r,'duration'),vin=g(r,'vin');
+      const start=String(g(r,'start_time')).length>10?String(g(r,'start_time')).substring(11):g(r,'start_time');
+      const end=String(g(r,'end_time')).length>10?String(g(r,'end_time')).substring(11):g(r,'end_time');
+      lines.push(`  • Date: ${dt} | Start: ${start} | End: ${end} | Duration: ${dur} sec | VIN: ${vin}`);
+    });
+  }
+  // RTS
+  if(d.rts&&d.rts.length){
+    toCheck.add('RTS — No Contact Attempted');
+    lines.push('');lines.push('RTS — No Contact Attempted:');
+    d.rts.forEach(r=>{
+      const tba=g(r,'Tracking ID')||'—',date=fmtDate(g(r,'Planned Delivery Date'));
+      const code=g(r,'DA Selected RTS Code')||'—';
+      const info=g(r,'Additional Information');
+      lines.push(`  • TBA: ${tba} | Date: ${date} | RTS: ${code}${info&&info!=='--'?' — '+info:''}`);
+    });
+  }
+  return {toCheck, reasonText:lines.join('\n'),
+          notesText:'DA acknowledged coaching. This session is intended to support continuous improvement.'};
+}
+
+// All checkbox labels in order (left col, right col interleaved as in grid)
+const REASON_LABELS=['DA Mishandled Package','DA was Unprofessional','DA did not follow my delivery instructions','Delivered to Wrong Address','Never Received Delivery','Received Wrong Item','CDF Performance Below Standard','DSB Performance Below Standard','Failure to Complete Pre-Trip Inspection (90 sec)','Failure to Turn Off Vehicle Engine','Delivery Executed 50+ Meters from Drop Point','Simultaneous Delivery Violation','RTS — No Contact Attempted','Other – See Notes'];
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// Build a full coaching-sheet HTML string for one driver (for batch printing)
+function buildSheetHTML(d,idx){
+  const cd=buildCoachingData(d);
+  const mm=String(TD.getMonth()+1).padStart(2,'0'),dd=String(TD.getDate()).padStart(2,'0'),yy=TD.getFullYear();
+  const items=REASON_LABELS.map(lbl=>{
+    const on=cd.toCheck.has(lbl);
+    return `<div class="reason-item${on?' checked':''}"><input type="checkbox" ${on?'checked':''} disabled><span>${esc(lbl)}</span></div>`;
+  }).join('');
+  return `<div class="batch-item" data-idx="${idx}">
+    <div class="batch-actions noPrint">
+      <button class="batch-print" onclick="printOneSheet(${idx})" title="Print only this coaching">🖨 Print</button>
+      <button class="batch-remove" onclick="removeSheet(${idx})" title="Remove this coaching">✕ Remove</button>
+    </div>
+    <div class="sheet batch-sheet">
+    <div class="sheet-title">Coaching Sheet</div>
+    <div class="field-row"><span class="field-label">Driver:</span><div class="driver-wrapper" style="flex:1"><div class="batch-line">${esc(d.name)}</div></div></div>
+    <div class="field-row"><span class="field-label">Date Of Coaching:</span><div class="date-wrapper"><span class="batch-date" data-kind="mm">${mm}</span> / <span class="batch-date" data-kind="dd">${dd}</span> / <span class="batch-date" data-kind="yyyy">${yy}</span></div></div>
+    <div class="reason-section"><span class="field-label">Reason For Coaching:</span>
+      <div class="reason-grid">${items}</div>
+      <div class="reason-print">${esc(cd.reasonText)}</div>
+    </div>
+    <div class="print-spacer"></div>
+    <div class="sig-section">
+      <div class="field-row"><span class="field-label">Employee Signature:</span><div class="batch-sig"></div></div>
+      <div class="field-row"><span class="field-label">Manager Signature:</span><div class="batch-sig"></div></div>
+    </div>
+    <div class="notes-block"><span class="field-label">Notes:</span><div class="notes-print">${esc(cd.notesText)}</div></div>
+    <div class="disclaimer">This coaching session has been documented to support your growth and performance improvement.</div>
+  </div></div>`;
+}
+
+// ── DATE TOGGLES ──
+function toggleSingleDate(){
+  const show=document.getElementById('singleShowDate').checked;
+  if(show){
+    document.getElementById('date-mm').value=String(TD.getMonth()+1).padStart(2,'0');
+    document.getElementById('date-dd').value=String(TD.getDate()).padStart(2,'0');
+    document.getElementById('date-yyyy').value=TD.getFullYear();
+  }else{
+    document.getElementById('date-mm').value='';
+    document.getElementById('date-dd').value='';
+    document.getElementById('date-yyyy').value='';
+  }
+}
+// ── BATCH DATE MODES ──
+function onBatchDateModeChange(){
+  const mode=document.getElementById('batchDateMode').value;
+  const inp=document.getElementById('batchManualDate');
+  inp.style.display = mode==='manual' ? 'inline-block' : 'none';
+  if(mode==='manual' && !inp.value){
+    // prefill with today as a starting point
+    inp.value=`${String(TD.getMonth()+1).padStart(2,'0')}/${String(TD.getDate()).padStart(2,'0')}/${TD.getFullYear()}`;
+  }
+  applyBatchDate();
+}
+
+function applyBatchDate(){
+  const mode=document.getElementById('batchDateMode').value;
+  let mm='',dd='',yy='';
+  if(mode==='today'){
+    mm=String(TD.getMonth()+1).padStart(2,'0');
+    dd=String(TD.getDate()).padStart(2,'0');
+    yy=String(TD.getFullYear());
+  }else if(mode==='manual'){
+    const raw=document.getElementById('batchManualDate').value.trim();
+    const parts=raw.split(/[\/\-\.]/);
+    mm=(parts[0]||'').padStart(2,'0').slice(0,2);
+    dd=(parts[1]||'').padStart(2,'0').slice(0,2);
+    yy=(parts[2]||'').slice(0,4);
+  }
+  // mode 'blank' → all empty (lines stay for hand-writing)
+  const cells=document.querySelectorAll('#batchContainer .batch-date');
+  cells.forEach(el=>{
+    const which=el.dataset.kind;
+    let v = which==='mm'?mm : which==='dd'?dd : yy;
+    el.textContent = v || '\u00A0\u00A0\u00A0';
+  });
+}
+
+// Split one driver into multiple "sub-drivers", one per individual incident
+function splitDriverByIncident(d){
+  const out=[];
+  // each impacting DSB record → its own sheet
+  const impDSB=d.dsb.filter(r=>
+    is1(g(r,'Impacts DSB'))||is1(g(r,'Simultaneous Deliveries'))||is1(g(r,'Delivered > 50 m'))||
+    is1(g(r,'Incorrect Scan Usage - Attended Delivery'))||is1(g(r,'Incorrect Scan Usage - Unattended Delivery'))||
+    is1(g(r,'No POD on Delivery'))||is1(g(r,'Scanned - Not Delivered - Not Returned'))
+  );
+  impDSB.forEach(r=>out.push({name:d.name,dsb:[r],cdf:[],fleet:[]}));
+  // each CDF complaint → its own sheet
+  d.cdf.forEach(r=>out.push({name:d.name,dsb:[],cdf:[r],fleet:[]}));
+  // each DVIC under-90 → its own sheet
+  d.fleet.forEach(r=>out.push({name:d.name,dsb:[],cdf:[],fleet:[r],rts:[]}));
+  (d.rts||[]).forEach(r=>out.push({name:d.name,dsb:[],cdf:[],fleet:[],rts:[r]}));
+  return out;
+}
+
+// ── GENERATE ALL — build coaching sheets for every driver with violations ──
+let BATCH_SHEETS=[]; // current sheets shown in the book
+
+function generateAll(skipScroll){
+  const modeEl=document.querySelector('input[name="batchMode"]:checked');
+  const mode=modeEl?modeEl.value:'consolidated';
+
+  let drivers=Object.values(DATA.drivers).filter(d=>{
+    const cd=buildCoachingData(d);
+    return cd.toCheck.size>0; // only drivers that actually have something to coach
+  }).sort((a,b)=>a.name.localeCompare(b.name));
+
+  if(!drivers.length){
+    if(!skipScroll) alert('No drivers with violations to generate.');
+    BATCH_SHEETS=[];
+    renderBatch();
+    return;
+  }
+
+  if(mode==='separated'){
+    BATCH_SHEETS=[];
+    drivers.forEach(d=>{ splitDriverByIncident(d).forEach(sd=>BATCH_SHEETS.push(sd)); });
+  }else{
+    BATCH_SHEETS=drivers.slice(); // one consolidated sheet per driver
+  }
+
+  document.getElementById('batchWrap').classList.add('active');
+  const nb=document.getElementById('navBatch'); if(nb) nb.style.display='block';
+  renderBatch();
+  if(!skipScroll) document.getElementById('batchWrap').scrollIntoView({behavior:'smooth'});
+}
+
+// Build a short violation summary string for a driver
+function violSummary(d){
+  const parts=[];
+  const impDSB=d.dsb.filter(r=>
+    is1(g(r,'Impacts DSB'))||is1(g(r,'Simultaneous Deliveries'))||is1(g(r,'Delivered > 50 m'))||
+    is1(g(r,'Incorrect Scan Usage - Attended Delivery'))||is1(g(r,'Incorrect Scan Usage - Unattended Delivery'))||
+    is1(g(r,'No POD on Delivery'))||is1(g(r,'Scanned - Not Delivered - Not Returned'))
+  ).length;
+  if(impDSB)     parts.push(`DSB ${impDSB}`);
+  if(d.cdf.length)   parts.push(`CDF ${d.cdf.length}`);
+  if(d.fleet.length) parts.push(`DVIC ${d.fleet.length}`);
+  if(d.rts&&d.rts.length) parts.push(`RTS ${d.rts.length}`);
+  return parts.join(' · ')||'—';
+}
+
+// Render the summary table (master list) of everyone in the book
+function summaryHTML(){
+  // group sheets by driver identity so the list shows one row per person
+  const byDriver={};
+  BATCH_SHEETS.forEach((d,i)=>{
+    const k=identityKey(d.name);
+    if(!byDriver[k]) byDriver[k]={name:d.name, idxs:[], dsb:0, cdf:0, fleet:0, rts:0};
+    if(d.name.length>byDriver[k].name.length) byDriver[k].name=d.name;
+    byDriver[k].idxs.push(i);
+    byDriver[k].dsb+=d.dsb.filter(r=>
+      is1(g(r,'Impacts DSB'))||is1(g(r,'Simultaneous Deliveries'))||is1(g(r,'Delivered > 50 m'))||
+      is1(g(r,'Incorrect Scan Usage - Attended Delivery'))||is1(g(r,'Incorrect Scan Usage - Unattended Delivery'))||
+      is1(g(r,'No POD on Delivery'))||is1(g(r,'Scanned - Not Delivered - Not Returned'))
+    ).length;
+    byDriver[k].cdf+=d.cdf.length;
+    byDriver[k].fleet+=d.fleet.length;
+    byDriver[k].rts+=(d.rts||[]).length;
+  });
+  const rows=Object.values(byDriver).sort((a,b)=>a.name.localeCompare(b.name));
+  const body=rows.map((r,n)=>{
+    const probs=[];
+    if(r.dsb)  probs.push(`DSB ${r.dsb}`);
+    if(r.cdf)  probs.push(`CDF ${r.cdf}`);
+    if(r.fleet)probs.push(`DVIC ${r.fleet}`);
+    if(r.rts)  probs.push(`RTS ${r.rts}`);
+    return `<tr>
+      <td style="text-align:center;color:#888">${n+1}</td>
+      <td><b>${esc(r.name)}</b></td>
+      <td>${probs.join(' · ')||'—'}</td>
+      <td class="noPrint" style="text-align:center">
+        <button class="sum-remove" onclick="removeDriver('${identityKey(r.name).replace(/'/g,"\\'")}')">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+  return `<div class="batch-item summary-item">
+    <div class="summary-sheet">
+      <div class="sheet-title">Coaching Summary — ${rows.length} Drivers</div>
+      <table class="summary-table">
+        <thead><tr><th style="width:36px">#</th><th>Driver</th><th>Problems</th><th class="noPrint" style="width:50px">Del</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+      <div class="summary-foot">Generated ${todayStr()} · ${BATCH_SHEETS.length} coaching sheet(s) follow</div>
+    </div>
+  </div>`;
+}
+
+// Remove a driver entirely — their summary row AND all their coaching sheets
+function removeDriver(idKey){
+  BATCH_SHEETS=BATCH_SHEETS.filter(d=>identityKey(d.name)!==idKey);
+  renderBatch();
+}
+
+// Render the current BATCH_SHEETS array
+function renderBatch(){
+  const container=document.getElementById('batchContainer');
+  if(!BATCH_SHEETS.length){
+    container.innerHTML='<div class="empty">No coachings left. Generate again or close.</div>';
+    document.getElementById('batchCount').textContent='0';
+    return;
+  }
+  const summary = document.getElementById('batchShowSummary') && document.getElementById('batchShowSummary').checked
+                  ? summaryHTML() : '';
+  container.innerHTML = summary + BATCH_SHEETS.map((d,i)=>buildSheetHTML(d,i)).join('');
+  // count unique drivers vs sheets
+  const uniqueDrivers=new Set(BATCH_SHEETS.map(d=>identityKey(d.name))).size;
+  document.getElementById('batchCount').textContent=
+    BATCH_SHEETS.length===uniqueDrivers ? uniqueDrivers
+    : `${uniqueDrivers} drivers / ${BATCH_SHEETS.length} sheets`;
+  applyBatchDate();
+}
+
+// Remove one coaching from the book
+function removeSheet(idx){
+  if(idx<0||idx>=BATCH_SHEETS.length)return;
+  BATCH_SHEETS.splice(idx,1);
+  renderBatch();
+}
+
+// Print ONLY one specific coaching sheet from the book
+function printOneSheet(idx){
+  const items=document.querySelectorAll('#batchContainer .batch-item');
+  const target=items[idx];
+  if(!target)return;
+  target.classList.add('print-only-this');
+  document.body.classList.add('printing-one');
+  // fit just this sheet
+  const sheet=target.querySelector('.batch-sheet');
+  if(sheet){
+    sheet.classList.add('measuring');
+    sheet.style.setProperty('--fit-fs','15px');
+    let fs=15,h=sheet.scrollHeight,guard=0;
+    while(h>1000 && fs>9 && guard<40){ fs-=0.5; sheet.style.setProperty('--fit-fs',fs+'px'); h=sheet.scrollHeight; guard++; }
+    sheet.classList.remove('measuring');
+  }
+  window.print();
+  setTimeout(()=>{
+    document.body.classList.remove('printing-one');
+    target.classList.remove('print-only-this');
+    if(sheet) sheet.style.removeProperty('--fit-fs');
+  },400);
+}
+
+function closeBatch(){
+  document.getElementById('batchWrap').classList.remove('active');
+  document.getElementById('batchContainer').innerHTML='';
+  BATCH_SHEETS=[];
+  const nb=document.getElementById('navBatch'); if(nb) nb.style.display='none';
+}
+
+// Measure each sheet and scale text down ONLY if it actually overflows one page.
+// We add a temporary 'measuring' class so the on-screen measurement matches
+// the print layout (no min-height, print padding, content width ~718px).
+const PAGE_FILL_PX = 1000; // printable content height of a letter page (~265mm) at 96dpi
+function fitSheetsToPage(selector){
+  document.querySelectorAll(selector).forEach(sheet=>{
+    sheet.classList.add('measuring');
+    sheet.style.setProperty('--fit-fs','15px');
+    let h=sheet.scrollHeight;
+    if(h>PAGE_FILL_PX){
+      let fs=15, guard=0;
+      while(h>PAGE_FILL_PX && fs>9 && guard<40){
+        fs-=0.5;
+        sheet.style.setProperty('--fit-fs', fs+'px');
+        h=sheet.scrollHeight;
+        guard++;
+      }
+    }
+    sheet.classList.remove('measuring');
+  });
+}
+function clearFit(selector){
+  document.querySelectorAll(selector).forEach(s=>s.style.removeProperty('--fit-fs'));
+}
+
+function printBatch(){
+  document.body.classList.add('printing-batch');
+  fitSheetsToPage('#batchContainer .batch-sheet');
+  window.print();
+  setTimeout(()=>{
+    document.body.classList.remove('printing-batch');
+    clearFit('#batchContainer .batch-sheet');
+  },400);
+}
+
+// Print the single coaching sheet, auto-scaled to one page
+function printSingle(){
+  fitSheetsToPage('.printable .sheet');
+  window.print();
+  setTimeout(()=>clearFit('.printable .sheet'),400);
+}
+
+// Print the current coaching but WITHOUT the date filled in
+function printSingleNoDate(){
+  const mm=document.getElementById('date-mm').value;
+  const dd=document.getElementById('date-dd').value;
+  const yy=document.getElementById('date-yyyy').value;
+  document.getElementById('date-mm').value='';
+  document.getElementById('date-dd').value='';
+  document.getElementById('date-yyyy').value='';
+  fitSheetsToPage('.printable .sheet');
+  window.print();
+  setTimeout(()=>{
+    clearFit('.printable .sheet');
+    // restore the date afterwards
+    document.getElementById('date-mm').value=mm;
+    document.getElementById('date-dd').value=dd;
+    document.getElementById('date-yyyy').value=yy;
+  },400);
+}
+
+// Print a completely BLANK coaching form (for hand-filling)
+function printEmpty(){
+  // snapshot current form so we can restore it
+  const snap={
+    driver:document.getElementById('driver-input').value,
+    mm:document.getElementById('date-mm').value,
+    dd:document.getElementById('date-dd').value,
+    yy:document.getElementById('date-yyyy').value,
+    reason:document.getElementById('reason').value,
+    notes:document.getElementById('notes').value,
+    reasonPrint:document.getElementById('reason-print').textContent,
+    notesPrint:document.getElementById('notes-print').textContent,
+    checks:[...document.querySelectorAll('.reason-grid input[type=checkbox]')].map(c=>c.checked)
+  };
+  // clear everything
+  document.getElementById('driver-input').value='';
+  document.getElementById('date-mm').value='';
+  document.getElementById('date-dd').value='';
+  document.getElementById('date-yyyy').value='';
+  document.getElementById('reason').value='';
+  document.getElementById('notes').value='';
+  document.getElementById('reason-print').textContent='';
+  document.getElementById('notes-print').textContent='';
+  document.querySelectorAll('.reason-grid input[type=checkbox]').forEach(c=>{c.checked=false;c.closest('.reason-item').classList.remove('checked');});
+
+  fitSheetsToPage('.printable .sheet');
+  window.print();
+  setTimeout(()=>{
+    clearFit('.printable .sheet');
+    // restore everything
+    document.getElementById('driver-input').value=snap.driver;
+    document.getElementById('date-mm').value=snap.mm;
+    document.getElementById('date-dd').value=snap.dd;
+    document.getElementById('date-yyyy').value=snap.yy;
+    document.getElementById('reason').value=snap.reason;
+    document.getElementById('notes').value=snap.notes;
+    document.getElementById('reason-print').textContent=snap.reasonPrint;
+    document.getElementById('notes-print').textContent=snap.notesPrint;
+    const boxes=document.querySelectorAll('.reason-grid input[type=checkbox]');
+    snap.checks.forEach((v,i)=>{ if(boxes[i]){ boxes[i].checked=v; boxes[i].closest('.reason-item').classList.toggle('checked',v);} });
+  },400);
+}
+
+// Print ONLY the summary list (no coaching sheets)
+function printSummaryOnly(){
+  // make sure the summary is visible
+  const chk=document.getElementById('batchShowSummary');
+  const wasOff=chk && !chk.checked;
+  if(wasOff){ chk.checked=true; renderBatch(); }
+  document.body.classList.add('printing-summary-only');
+  window.print();
+  setTimeout(()=>{
+    document.body.classList.remove('printing-summary-only');
+    if(wasOff){ chk.checked=false; renderBatch(); }
+  },300);
+}
+
+function fillCoaching(d){
+  if(!d) return;
+
+  // Set name and date
+  document.getElementById('driver-input').value = d.name;
+  const showDate = document.getElementById('singleShowDate') ? document.getElementById('singleShowDate').checked : true;
+  document.getElementById('date-mm').value  = showDate ? String(TD.getMonth()+1).padStart(2,'0') : '';
+  document.getElementById('date-dd').value  = showDate ? String(TD.getDate()).padStart(2,'0') : '';
+  document.getElementById('date-yyyy').value = showDate ? TD.getFullYear() : '';
+
+  // All DSB records that impact — either Impacts DSB=1 OR has a violation=1
+  const impDSB = d.dsb.filter(r =>
+    is1(g(r,'Impacts DSB')) ||
+    is1(g(r,'Simultaneous Deliveries')) ||
+    is1(g(r,'Delivered > 50 m')) ||
+    is1(g(r,'Incorrect Scan Usage - Attended Delivery')) ||
+    is1(g(r,'Incorrect Scan Usage - Unattended Delivery')) ||
+    is1(g(r,'No POD on Delivery')) ||
+    is1(g(r,'Scanned - Not Delivered - Not Returned'))
+  );
+
+  // ── CHECKBOXES — exact match ──
+  const toCheck = new Set();
+  impDSB.forEach(r=>{
+    if(is1(g(r,'Simultaneous Deliveries')))                         toCheck.add('Simultaneous Delivery Violation');
+    if(is1(g(r,'Delivered > 50 m')))                               toCheck.add('Delivery Executed 50+ Meters from Drop Point');
+    if(is1(g(r,'Incorrect Scan Usage - Attended Delivery')) ||
+       is1(g(r,'Incorrect Scan Usage - Unattended Delivery')))      toCheck.add('DSB Performance Below Standard');
+    if(is1(g(r,'No POD on Delivery')))                             toCheck.add('DSB Performance Below Standard');
+    if(is1(g(r,'Scanned - Not Delivered - Not Returned')))          toCheck.add('DSB Performance Below Standard');
+  });
+  if(impDSB.length)  toCheck.add('DSB Performance Below Standard');
+  if(d.cdf.length)   toCheck.add('CDF Performance Below Standard');
+  if(d.fleet.length) toCheck.add('Failure to Complete Pre-Trip Inspection (90 sec)');
+  if(d.rts&&d.rts.length) toCheck.add('RTS — No Contact Attempted');
+  d.cdf.forEach(r=>{
+    if(is1(g(r,'DA Mishandled Package')))                          toCheck.add('DA Mishandled Package');
+    if(is1(g(r,'DA was Unprofessional')))                          toCheck.add('DA was Unprofessional');
+    if(is1(g(r,'DA did not follow my delivery instructions')))     toCheck.add('DA did not follow my delivery instructions');
+    if(is1(g(r,'Delivered to Wrong Address')))                     toCheck.add('Delivered to Wrong Address');
+    if(is1(g(r,'Never Received Delivery')))                        toCheck.add('Never Received Delivery');
+    if(is1(g(r,'Received Wrong Item')))                            toCheck.add('Received Wrong Item');
+  });
+
+  document.querySelectorAll('.reason-item').forEach(label=>{
+    const cb   = label.querySelector('input');
+    const text = label.querySelector('span').textContent.trim();
+    cb.checked = toCheck.has(text);
+    label.classList.toggle('checked', cb.checked);
+  });
+
+  // ── PACKAGE DETAILS — TBA + dates ──
+  const lines = [];
+
+  if(impDSB.length){
+    lines.push('DSB Records:');
+    impDSB.forEach(r=>{
+      const tba      = g(r,'Tracking ID') || '—';
+      const delDate  = fmtDate(g(r,'Delivery Date'));
+      const pickDate = fmtDate(g(r,'Pickup Date'));
+      const concDate = fmtDate(g(r,'Concession Date'));
+      const date     = g(r,'Date');
+      const type     = g(r,'Delivery Type') || '—';
+      const viols    = dsbViols(r);
+
+      // build date string from whatever is available
+      const dates = [];
+      if(date && date!=='—')       dates.push(`Date: ${date}`);
+      if(delDate !== '—')          dates.push(`Delivery: ${delDate}`);
+      if(pickDate !== '—')         dates.push(`Pickup: ${pickDate}`);
+      if(concDate !== '—')         dates.push(`Concession: ${concDate}`);
+      const dateStr = dates.length ? dates.join(' | ') : '—';
+
+      const violStr = viols.length ? viols.join(', ') : 'DSB Impact';
+      lines.push(`  • TBA: ${tba} | ${dateStr} | Type: ${type} | Violation: ${violStr}`);
+    });
+  }
+
+  if(d.cdf.length){
+    lines.push('');
+    lines.push('CDF Records:');
+    d.cdf.forEach(r=>{
+      const tba    = g(r,'Tracking ID')||'—';
+      const date   = fmtDate(g(r,'Delivery Date'));
+      const viols  = cdfViols(r).join(', ')||'Negative Feedback';
+      const detail = g(r,'Feedback Details');
+      lines.push(`  • TBA: ${tba} | Date: ${date} | ${viols}${detail?' — '+detail:''}`);
+    });
+  }
+
+  if(d.fleet.length){
+    lines.push('');
+    lines.push('DVIC Pre-Trip Inspection under 90 sec:');
+    d.fleet.forEach(r=>{
+      const dt    = g(r,'start_date');
+      const dur   = g(r,'duration');
+      const vin   = g(r,'vin');
+      const start = String(g(r,'start_time')).length > 10
+        ? String(g(r,'start_time')).substring(11)
+        : g(r,'start_time');
+      const end   = String(g(r,'end_time')).length > 10
+        ? String(g(r,'end_time')).substring(11)
+        : g(r,'end_time');
+      lines.push(`  • Date: ${dt} | Start: ${start} | End: ${end} | Duration: ${dur} sec | VIN: ${vin}`);
+    });
+  }
+
+  // RTS
+  if(d.rts&&d.rts.length){
+    lines.push('');
+    lines.push('RTS — No Contact Attempted:');
+    d.rts.forEach(r=>{
+      const tba  = g(r,'Tracking ID')||'—';
+      const date = fmtDate(g(r,'Planned Delivery Date'));
+      const code = g(r,'DA Selected RTS Code')||'—';
+      const info=g(r,'Additional Information');
+      lines.push(`  • TBA: ${tba} | Date: ${date} | RTS: ${code}${info&&info!=='--'?' — '+info:''}`);
+    });
+  }
+
+  // RTS — No Contact Attempted
+  if(d.rts&&d.rts.length){
+    lines.push('');
+    lines.push('RTS — No Contact Attempted:');
+    d.rts.forEach(r=>{
+      const tba  = g(r,'Tracking ID')||'—';
+      const date = fmtDate(g(r,'Planned Delivery Date'));
+      const code = g(r,'DA Selected RTS Code')||'—';
+      const info=g(r,'Additional Information');
+      lines.push(`  • TBA: ${tba} | Date: ${date} | RTS: ${code}${info&&info!=='--'?' — '+info:''}`);
+    });
+  }
+
+  const reasonEl = document.getElementById('reason');
+  const notesEl  = document.getElementById('notes');
+  reasonEl.value = lines.join('\n');
+  // Notes holds only the acknowledgment — records already listed above in Reason.
+  notesEl.value  = 'DA acknowledged coaching. This session is intended to support continuous improvement.';
+  // Sync print mirror divs
+  document.getElementById('reason-print').textContent = reasonEl.value;
+  document.getElementById('notes-print').textContent  = notesEl.value;
+  // Auto-size textareas on screen
+  [reasonEl, notesEl].forEach(el => {
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  });
+}
+
+// ── CLEAR FORM ──
+function clearForm(){
+  document.getElementById('driver-input').value='';
+  document.getElementById('date-mm').value='';
+  document.getElementById('date-dd').value='';
+  document.getElementById('date-yyyy').value='';
+  document.getElementById('reason').value='';
+  document.getElementById('reason-print').textContent='';
+  document.getElementById('notes-print').textContent='';
+  document.querySelectorAll('.reason-item input').forEach(cb=>{cb.checked=false;});
+  document.querySelectorAll('.reason-item').forEach(el=>el.classList.remove('checked'));
+  document.getElementById('emp_sig').value='';
+  document.getElementById('mgr_sig').value='';
+  document.getElementById('notes').value='';
+}
+
+// ── CLEAR ALL ──
+function clearAll(){
+  DATA={dsb:[],cdf:[],fleet:[],rts:[],drivers:{},selected:null};
+  FILES={dsb:[],cdf:[],fleet:[],rts:[]};
+  ['dsb','cdf','fleet'].forEach(t=>{
+    document.getElementById('ubox-'+t).classList.remove('loaded');
+    document.getElementById('ustat-'+t).innerHTML='';
+    document.getElementById('file-'+t).value='';
+  });
+  // also clear the coaching form and print mirrors
+  clearForm();
+  renderStats();renderList();
+  document.getElementById('profile').innerHTML='<div class="empty">Select a driver.</div>';
+  document.getElementById('driver-dropdown').style.display='none';
+  document.getElementById('driver-dropdown').innerHTML='';
+  document.getElementById('status').textContent='Waiting for files...';
+  document.getElementById('status').className='';
+}
+
+// ── DRIVER DROPDOWN (coaching sheet) ──
+let ddActive=-1;
+const driverInput=document.getElementById('driver-input');
+const dd=document.getElementById('driver-dropdown');
+
+function getDriverNames(){
+  const loaded=Object.values(DATA.drivers).map(d=>d.name);
+  // fallback list if no files loaded yet
+  return loaded.length?loaded:[];
+}
+function filterDrivers(){
+  const q=driverInput.value.toLowerCase();
+  const names=getDriverNames();
+  const filtered=q?names.filter(n=>n.toLowerCase().includes(q)):names;
+  renderDropdown(filtered);
+}
+function renderDropdown(list){
+  if(!list.length){dd.style.display='none';return;}
+  dd.innerHTML=list.map(n=>`<div class="dd-item" data-name="${n}">${n}</div>`).join('');
+  dd.style.display='block';
+  ddActive=-1;
+}
+// Single delegated listener — set once, never accumulates
+dd.addEventListener('mousedown', function(e){
+  const item=e.target.closest('.dd-item');
+  if(item) pickDriver(item.dataset.name);
+});
+function pickDriver(name){
+  driverInput.value=name;
+  dd.style.display='none';
+  // auto-fill coaching if driver data exists
+  const k=identityKey(name);
+  if(DATA.drivers[k])fillCoaching(DATA.drivers[k]);
+}
+function showDropdown(){filterDrivers();}
+function navDropdown(e){
+  const items=dd.querySelectorAll('.dd-item');
+  if(!items.length)return;
+  if(e.key==='ArrowDown'){e.preventDefault();ddActive=Math.min(ddActive+1,items.length-1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();ddActive=Math.max(ddActive-1,0);}
+  else if(e.key==='Enter'&&ddActive>=0){e.preventDefault();pickDriver(items[ddActive].dataset.name);return;}
+  else if(e.key==='Escape'){dd.style.display='none';return;}
+  items.forEach((el,i)=>el.classList.toggle('active',i===ddActive));
+  if(ddActive>=0)items[ddActive].scrollIntoView({block:'nearest'});
+}
+document.addEventListener('click',e=>{if(!e.target.closest('.driver-wrapper'))dd.style.display='none';});
+document.querySelectorAll('.reason-item').forEach(label=>{
+  label.addEventListener('change',()=>label.classList.toggle('checked',label.querySelector('input').checked));
+});
+
+// ── DATE HELPERS ──
+function autoTab(el,nextId){if(el.value.length>=el.maxLength)document.getElementById(nextId).focus();}
+function applyPicker(val){
+  if(!val)return;
+  const[y,m,d]=val.split('-');
+  document.getElementById('date-mm').value=m;
+  document.getElementById('date-dd').value=d;
+  document.getElementById('date-yyyy').value=y;
+}
+
+renderStats();renderList();
+// Auto-focus search on load
+setTimeout(()=>{ const s=document.getElementById('search'); if(s) s.focus(); },400);
+
+// ══════════════════════════════════════════
+// ── IMPROVEMENTS ──
+// ══════════════════════════════════════════
+
+// ── TOAST ──
+function toast(msg, duration=2500){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(t._tid);
+  t._tid=setTimeout(()=>t.classList.remove('show'), duration);
+}
+
+// ── AUTO-RESIZE TEXTAREA ──
+function autoResize(el){
+  el.style.height='auto';
+  el.style.height=el.scrollHeight+'px';
+}
+function initAutoResize(){
+  document.querySelectorAll('.reason-textarea, .notes-block textarea').forEach(el=>{
+    autoResize(el);
+    el.addEventListener('input',()=>autoResize(el));
+  });
+}
+
+// ── CHAR COUNTERS ──
+// Approx chars that fit in print area per field
+const REASON_LIMIT=400;
+const NOTES_LIMIT=900;
+function updateReasonCounter(){
+  const el=document.getElementById('reason');
+  const cc=document.getElementById('reasonCounter');
+  if(!el||!cc)return;
+  const n=el.value.length;
+  cc.textContent=`${n} chars`;
+  cc.className='char-counter'+(n>REASON_LIMIT?' over':n>REASON_LIMIT*0.8?' warn':'');
+}
+function updateNoteCounter(){
+  const el=document.getElementById('notes');
+  const cc=document.getElementById('noteCounter');
+  if(!el||!cc)return;
+  const n=el.value.length;
+  cc.textContent=`${n} chars`;
+  cc.className='char-counter'+(n>NOTES_LIMIT?' over':n>NOTES_LIMIT*0.8?' warn':'');
+}
+
+// ── OVERFLOW WARNING ──
+function checkOverflow(){
+  const r=document.getElementById('reason');
+  const n=document.getElementById('notes');
+  const warn=document.getElementById('overflowWarn');
+  if(!warn)return;
+  const over=(r&&r.value.length>REASON_LIMIT)||(n&&n.value.length>NOTES_LIMIT);
+  warn.classList.toggle('visible',over);
+  if(over){
+    const msgs=[];
+    if(r&&r.value.length>REASON_LIMIT) msgs.push(`Details (${r.value.length}/${REASON_LIMIT})`);
+    if(n&&n.value.length>NOTES_LIMIT)  msgs.push(`Notes (${n.value.length}/${NOTES_LIMIT})`);
+    document.getElementById('overflowMsg').textContent=`⚠️ May overflow one page: ${msgs.join(', ')} — consider shortening before printing.`;
+  }
+}
+
+// ── COPY NOTES (from preview in profile) ──
+function copyNotes(){
+  const preview=document.querySelector('.preview');
+  if(!preview)return;
+  navigator.clipboard.writeText(preview.textContent.trim())
+    .then(()=>toast('✓ Notes copied to clipboard'))
+    .catch(()=>toast('⚠️ Copy failed — select text manually'));
+}
+
+// ── COPY notes from coaching sheet ──
+function copySheetNotes(){
+  const el=document.getElementById('notes');
+  if(!el)return;
+  navigator.clipboard.writeText(el.value.trim())
+    .then(()=>toast('✓ Notes copied'))
+    .catch(()=>toast('⚠️ Copy failed'));
+}
+
+// ── EXPAND MODAL ──
+function openModal(){
+  const notes=document.getElementById('notes');
+  const modal=document.getElementById('notesModal');
+  const mta=document.getElementById('modal-notes');
+  if(!modal||!mta)return;
+  mta.value=notes?notes.value:'';
+  modal.classList.add('open');
+  setTimeout(()=>mta.focus(),50);
+}
+function closeModal(){
+  document.getElementById('notesModal').classList.remove('open');
+}
+function applyModalNotes(){
+  const mta=document.getElementById('modal-notes');
+  const notes=document.getElementById('notes');
+  if(notes&&mta){
+    notes.value=mta.value;
+    autoResize(notes);
+    updateNoteCounter();
+    checkOverflow();
+    // sync notes-print div
+    const np=document.getElementById('notes-print');
+    if(np) np.textContent=notes.value;
+  }
+  toast('✓ Notes applied');
+}
+function copyModalNotes(){
+  const mta=document.getElementById('modal-notes');
+  if(!mta)return;
+  navigator.clipboard.writeText(mta.value.trim())
+    .then(()=>toast('✓ Copied'))
+    .catch(()=>toast('⚠️ Copy failed'));
+}
+
+// ── SEARCH HIGHLIGHT ──
+function highlightMatch(name, query){
+  if(!query||query.trim()==='') return name;
+  const q=query.trim().replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return name.replace(new RegExp(`(${q})`,'gi'),'<span class="hl">$1</span>');
+}
+
+// ── KEYBOARD SHORTCUTS ──
+document.addEventListener('keydown', e=>{
+  // Ctrl/Cmd+P = print coaching
+  if((e.ctrlKey||e.metaKey)&&e.key==='p'){
+    if(document.querySelector('.sheet')){
+      e.preventDefault();
+      const printBtn=document.querySelector('.controls-bar button.cprimary')||document.querySelector('.controls-bar button:last-child');
+      if(printBtn) printBtn.click();
+    }
+  }
+  // Ctrl/Cmd+F = focus driver search
+  if((e.ctrlKey||e.metaKey)&&e.key==='f'){
+    const search=document.getElementById('search');
+    if(search){e.preventDefault();search.focus();search.select();}
+  }
+  // Escape = close modal
+  if(e.key==='Escape'){
+    closeModal();
+  }
+  // Arrow keys in driver list (when list is focused area)
+  if((e.key==='ArrowDown'||e.key==='ArrowUp')&&document.activeElement===document.getElementById('search')){
+    e.preventDefault();
+    const items=document.querySelectorAll('.driverItem');
+    if(!items.length)return;
+    const activeItem=document.querySelector('.driverItem.active');
+    let idx=[...items].indexOf(activeItem);
+    idx=e.key==='ArrowDown'?Math.min(idx+1,items.length-1):Math.max(idx-1,0);
+    items[idx].click();
+    items[idx].scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
+});
+
+// ── AUTO-SCROLL active driver into view in list ──
+function scrollActiveDriver(){
+  const active=document.querySelector('.driverItem.active');
+  if(active) active.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ── PATCH fillCoaching to trigger counters + resize ──
+const _origFillCoaching=fillCoaching;
+fillCoaching=function(d){
+  _origFillCoaching(d);
+  setTimeout(()=>{
+    initAutoResize();
+    updateReasonCounter();
+    updateNoteCounter();
+    checkOverflow();
+    scrollActiveDriver();
+  },50);
+};
+
+// ── PATCH clearForm to reset counters ──
+const _origClearForm=clearForm;
+clearForm=function(){
+  _origClearForm();
+  updateReasonCounter();
+  updateNoteCounter();
+  checkOverflow();
+  initAutoResize();
+};
+
+// ── PATCH notes sync on direct input (reason-print / notes-print) ──
+document.addEventListener('DOMContentLoaded',()=>initAutoResize());
+setTimeout(()=>initAutoResize(),300);
+
+// Sync notes textarea → notes-print on input
+document.addEventListener('input', e=>{
+  if(e.target.id==='notes'){
+    const np=document.getElementById('notes-print');
+    if(np) np.textContent=e.target.value;
+  }
+  if(e.target.id==='reason'){
+    const rp=document.getElementById('reason-print');
+    if(rp) rp.textContent=e.target.value;
+  }
+});
+
+// ── SHORTCUT HINTS in controls bar ──
+(function addShortcutHints(){
+  const cb=document.querySelector('.controls-bar');
+  if(!cb)return;
+  const hint=document.createElement('span');
+  hint.style.cssText='font-family:Arial,sans-serif;font-size:10px;color:#aaa;margin-left:auto;align-self:center;';
+  hint.innerHTML='<span class="kbd">Ctrl+P</span> Print &nbsp; <span class="kbd">Ctrl+F</span> Search &nbsp; <span class="kbd">↑↓</span> Navigate';
+  cb.appendChild(hint);
+})();
+
+// ── MINI NAV scroll show/hide ──
+// Single scroll handler for both miniNav and scroll-to-top button
+(function(){
+  const nav=document.getElementById('miniNav');
+  const btn=document.getElementById('scrollTopBtn');
+  window.addEventListener('scroll',function(){
+    const y=window.scrollY;
+    // miniNav
+    if(nav) nav.style.transform=y>120?'translateY(0)':'translateY(-100%)';
+    // scroll-to-top button
+    if(btn){
+      if(y>400){btn.style.display='flex';btn.style.alignItems='center';btn.style.justifyContent='center';}
+      else{btn.style.display='none';}
+    }
+  },{passive:true});
+})();
+
+// ── ACTIVE DRIVER BANNER ──
+function updateActiveDriverBanner(name){
+  const banner=document.getElementById('activeDriverBanner');
+  const nameEl=document.getElementById('activeDriverName');
+  if(banner&&nameEl){
+    nameEl.textContent=name;
+    banner.style.display='flex';
+  }
+}
+
+// ── BATCH COLLAPSE ──
+// Allow clicking on a batch sheet's title to collapse/expand it
+document.addEventListener('click',function(e){
+  const title=e.target.closest('.batch-sheet .sheet-title');
+  if(!title)return;
+  const sheet=title.closest('.batch-sheet');
+  if(!sheet)return;
+  const body=sheet.querySelector('.field-row,.reason-section,.sig-section,.notes-block,.disclaimer,.print-spacer');
+  const items=sheet.querySelectorAll('.field-row,.reason-section,.sig-section,.notes-block,.disclaimer,.print-spacer');
+  const collapsed=sheet.dataset.collapsed==='1';
+  items.forEach(el=>{
+    el.style.display=collapsed?'':'none';
+  });
+  sheet.dataset.collapsed=collapsed?'0':'1';
+  title.style.cursor='pointer';
+  title.title=collapsed?'Click to collapse':'Click to expand';
+});
+// Set initial cursor on batch sheet titles
+setTimeout(()=>{
+  document.querySelectorAll('#batchContainer .sheet-title').forEach(t=>{
+    t.style.cursor='pointer';
+    t.title='Click to collapse';
+  });
+},500);
+
+// ── AUTO-UPDATE REPORT LINKS with current week/date ──
+(function updateReportLinks(){
+  const now = new Date();
+
+  // ISO week number
+  function getISOWeek(d){
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay()||7));
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+    return Math.ceil((((date - yearStart) / 86400000) + 1)/7);
+  }
+  function getISOYear(d){
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay()||7));
+    return date.getUTCFullYear();
+  }
+
+  const isoYear = getISOYear(now);
+  const isoWeek = String(getISOWeek(now)).padStart(2,'0');
+  const weekStr = `${isoYear}-W${isoWeek}`;
+
+  // Today's date for RTS (daily)
+  const y = now.getFullYear();
+  const m = String(now.getMonth()+1).padStart(2,'0');
+  const day = String(now.getDate()).padStart(2,'0');
+  const todayStr = `${y}-${m}-${day}`;
+
+  // Update each link
+  ['link-dsb','link-cdf','link-dvic'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.href = el.href.replace(/to=[\d-W]+/, 'to='+weekStr);
+  });
+  const rtsEl = document.getElementById('link-rts');
+  if(rtsEl) rtsEl.href = rtsEl.href.replace(/to=[\d-W]+/, 'to='+weekStr);
+})();
+
+</script>
+<!-- Scroll to top button -->
+<button id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top"
+  style="display:none;position:fixed;bottom:28px;right:28px;z-index:9998;
+    background:var(--accent);color:white;border:none;border-radius:50%;
+    width:44px;height:44px;font-size:20px;cursor:pointer;
+    box-shadow:0 4px 14px rgba(192,57,43,.4);transition:opacity .2s;
+    font-family:Arial,sans-serif;line-height:1" class="noPrint">↑</button>
+<script>
+
+</script>
+</body>
+</html>
